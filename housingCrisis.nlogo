@@ -1,34 +1,88 @@
+patches-own[
+  district
+  occupied?
+
+]
+
+
 to setup
   clear-all
   ask patches[
-    if pxcor < -100 [ set pcolor orange]
-    if pxcor > 100 [ set pcolor green]
+
+    ;; orange & green
+    if pxcor < -200 [
+      set district orange
+    ]
+    if pxcor > 200 [
+      set district green
+    ]
     if pycor > 200 [
       ifelse pxcor < 0 [
-        set pcolor orange
+
+        set district orange
       ]
       [
-        set pcolor green
+
+        set district green
       ]
     ]
 
-    ;; red
-    if pxcor >= -100 and pxcor <= 100 [
+    ;; purple
+    if pxcor >= -200 and pxcor <= 200 [
       if pycor >= 0 and pycor <= 200 [
-        set pcolor 115
+
+        set district 115
       ]
     ]
 
     ;; blue
-    if pxcor >= -150 and pxcor <= 150 [
+    if pxcor >= -200 and pxcor <= 200 [
       if pycor >= -300 and pycor <= 0 [
-        set pcolor blue
+
+        set district blue
       ]
     ]
 
     ;; centre
-    if pxcor > -75 and pxcor < 75 [
-      if pycor > -75 and pycor < 75 [
+    if pxcor > -100 and pxcor < 100 [
+      if pycor > -100 and pycor < 100 [
+
+        set district pink
+      ]
+    ]
+  ]
+
+  ask patches [
+    if district = orange [
+      if random 100 >= orange_district_density [
+        set pcolor orange - 3
+      ]
+      if pcolor = black [
+          ifelse random 100 <= orange_occupied [
+            set pcolor orange
+          ] [
+            set pcolor orange  + 2
+          ]
+        ]
+    ]
+    if district = 115 [
+      if random 100 >= purple_district_density [
+        set pcolor 115
+      ]
+    ]
+    if district = blue [
+      if random 100 >= blue_district_density [
+        set pcolor blue
+      ]
+    ]
+    if district = green [
+      if random 100 >= green_district_density [
+        set pcolor green
+      ]
+    ]
+
+    if district = pink [
+      if random 100 >= green_district_density [
         set pcolor pink
       ]
     ]
@@ -37,13 +91,13 @@ to setup
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-429
+397
 42
-1120
-743
+1152
+585
 -1
 -1
-0.1015
+1.067332
 1
 10
 1
@@ -53,10 +107,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--300
-300
--300
-300
+-350
+350
+-250
+250
 0
 0
 1
@@ -65,9 +119,9 @@ ticks
 
 BUTTON
 59
-78
-300
-153
+32
+224
+79
 NIL
 setup
 NIL
@@ -79,6 +133,171 @@ NIL
 NIL
 NIL
 1
+
+SLIDER
+1190
+45
+1391
+78
+orange_district_density
+orange_district_density
+0
+100
+40.0
+5
+1
+NIL
+HORIZONTAL
+
+SLIDER
+1190
+111
+1386
+144
+purple_district_density
+purple_district_density
+0
+100
+25.0
+5
+1
+NIL
+HORIZONTAL
+
+SLIDER
+1190
+78
+1372
+111
+blue_district_density
+blue_district_density
+0
+100
+50.0
+5
+1
+NIL
+HORIZONTAL
+
+SLIDER
+1190
+144
+1383
+177
+green_district_density
+green_district_density
+0
+100
+45.0
+5
+1
+NIL
+HORIZONTAL
+
+SLIDER
+1190
+177
+1371
+210
+pink_district_density
+pink_district_density
+0
+100
+55.0
+5
+1
+NIL
+HORIZONTAL
+
+SLIDER
+109
+550
+281
+583
+orange_occupied
+orange_occupied
+0
+100
+43.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+57
+162
+272
+195
+international%
+international%
+0
+100
+29.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+57
+296
+229
+329
+house_density
+house_density
+0
+100
+59.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+55
+344
+283
+377
+nationality_discrimination%
+nationality_discrimination%
+0
+100
+56.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+56
+394
+240
+427
+sex_discrimination%
+sex_discrimination%
+0
+100
+69.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+59
+128
+231
+161
+new_students
+new_students
+0
+100
+100.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
