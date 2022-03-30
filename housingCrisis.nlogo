@@ -1,100 +1,119 @@
 patches-own[
+  is-house?
+  is-rental?
+
   district
+  price
+  capacity
+
+  shared?
   occupied?
+  racist?
+  sexist?
 
 ]
 
-
 to setup
   clear-all
-  ask patches[
 
-    ;; orange & green
+  ;; Set Districts
+  ask patches[
     if pxcor < -200 [
-      set district orange
+      set district "left"
     ]
     if pxcor > 200 [
-      set district green
+      set district "right"
     ]
     if pycor > 200 [
-      ifelse pxcor < 0 [
-
-        set district orange
-      ]
-      [
-
-        set district green
-      ]
+      ifelse pxcor < 0 [ set district "left" ]
+      [ set district "right" ]
     ]
-
-    ;; purple
     if pxcor >= -200 and pxcor <= 200 [
       if pycor >= 0 and pycor <= 200 [
-
-        set district 115
+        set district "top"
       ]
     ]
-
-    ;; blue
     if pxcor >= -200 and pxcor <= 200 [
       if pycor >= -300 and pycor <= 0 [
-
-        set district blue
+        set district "bottom"
       ]
     ]
-
-    ;; centre
     if pxcor > -100 and pxcor < 100 [
       if pycor > -100 and pycor < 100 [
-
-        set district pink
+        set district "center"
       ]
     ]
   ]
 
+  ;; Paint district border
   ask patches [
-    if district = orange [
-      if random 100 >= orange_district_density [
-        set pcolor orange - 3
-      ]
-      if pcolor = black [
-          ifelse random 100 <= orange_occupied [
-            set pcolor orange
-          ] [
-            set pcolor orange  + 2
-          ]
-        ]
+    if count neighbors with [district != [district] of myself] > 0 [
+      set pcolor blue
     ]
-    if district = 115 [
-      if random 100 >= purple_district_density [
-        set pcolor 115
-      ]
-    ]
-    if district = blue [
-      if random 100 >= blue_district_density [
-        set pcolor blue
-      ]
-    ]
-    if district = green [
-      if random 100 >= green_district_density [
-        set pcolor green
-      ]
-    ]
+  ]
 
-    if district = pink [
-      if random 100 >= green_district_density [
-        set pcolor pink
+  ;; Remove district in border lines
+  ask patches with [pcolor = blue] [ set district -1 ]
+
+
+  ;; create houses
+  ask patches [
+    set is-house? false
+    if random 100 < house_density and pcolor != blue [
+      set is-house? true
+    ]
+  ]
+
+  ;; Add non-rentals houses
+  ask patches with [is-house?] [
+    set is-rental? true
+    if district = "left" [
+      if random 100 > rental_density_left [
+        set is-rental? false
       ]
+    ]
+    if district = "right" [
+      if random 100 > rental_density_right [
+        set is-rental? false
+      ]
+    ]
+    if district = "top" [
+      if random 100 > rental_density_top [
+        set is-rental? false
+      ]
+    ]
+    if district = "bottom" [
+      if random 100 > rental_density_bottom [
+        set is-rental? false
+      ]
+    ]
+    if district = "center" [
+      if random 100 > rental_density_center [
+        set is-rental? false
+      ]
+    ]
+  ]
+
+  ;; paint non-rentals
+  ask patches with [is-rental? = false] [ set pcolor gray]
+
+  ;; populate houses
+  ask patches with [is-rental? = true] [
+    set occupied? false
+    set pcolor green
+    if random 100 < initially_occupied [
+      set occupied? true
+      set pcolor red
     ]
   ]
 
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-397
-42
-1152
-585
+392
+41
+1148
+584
 -1
 -1
 1.067332
@@ -118,10 +137,10 @@ ticks
 30.0
 
 BUTTON
-59
-32
-224
-79
+21
+27
+186
+74
 NIL
 setup
 NIL
@@ -135,100 +154,10 @@ NIL
 1
 
 SLIDER
-1190
-45
-1391
-78
-orange_district_density
-orange_district_density
-0
-100
-40.0
-5
-1
-NIL
-HORIZONTAL
-
-SLIDER
-1190
-111
-1386
-144
-purple_district_density
-purple_district_density
-0
-100
-25.0
-5
-1
-NIL
-HORIZONTAL
-
-SLIDER
-1190
-78
-1372
-111
-blue_district_density
-blue_district_density
-0
-100
-50.0
-5
-1
-NIL
-HORIZONTAL
-
-SLIDER
-1190
-144
-1383
-177
-green_district_density
-green_district_density
-0
-100
-45.0
-5
-1
-NIL
-HORIZONTAL
-
-SLIDER
-1190
-177
-1371
-210
-pink_district_density
-pink_district_density
-0
-100
-55.0
-5
-1
-NIL
-HORIZONTAL
-
-SLIDER
-109
-550
-281
-583
-orange_occupied
-orange_occupied
-0
-100
-43.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-57
-162
-272
+21
 195
+196
+228
 international%
 international%
 0
@@ -240,40 +169,40 @@ NIL
 HORIZONTAL
 
 SLIDER
-57
-296
-229
-329
+20
+336
+197
+369
 house_density
 house_density
 0
 100
-59.0
+80.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-55
-344
-283
-377
+699
+628
+927
+661
 nationality_discrimination%
 nationality_discrimination%
 0
 100
-56.0
+57.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-56
-394
-240
-427
+699
+666
+883
+699
 sex_discrimination%
 sex_discrimination%
 0
@@ -285,19 +214,189 @@ NIL
 HORIZONTAL
 
 SLIDER
-59
-128
-231
-161
-new_students
-new_students
+487
+634
+659
+667
+studio_density
+studio_density
 0
 100
-100.0
+50.0
 1
 1
 NIL
 HORIZONTAL
+
+SLIDER
+487
+674
+665
+707
+stud_house_density
+stud_house_density
+0
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+20
+369
+197
+402
+rental_density_left
+rental_density_left
+0
+100
+79.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+20
+402
+197
+435
+rental_density_right
+rental_density_right
+0
+100
+36.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+20
+434
+197
+467
+rental_density_top
+rental_density_top
+0
+100
+69.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+20
+466
+197
+499
+rental_density_bottom
+rental_density_bottom
+0
+100
+66.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+20
+499
+197
+532
+rental_density_center
+rental_density_center
+0
+100
+84.0
+1
+1
+NIL
+HORIZONTAL
+
+INPUTBOX
+20
+131
+195
+191
+influx
+780.0
+1
+0
+Number
+
+INPUTBOX
+195
+131
+356
+191
+outflux
+0.0
+1
+0
+Number
+
+BUTTON
+193
+28
+358
+75
+NIL
+go
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+SLIDER
+20
+303
+197
+336
+initially_occupied
+initially_occupied
+0
+100
+80.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+196
+195
+356
+228
+new_houses
+new_houses
+0
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
+
+SWITCH
+21
+229
+197
+262
+allow_permits
+allow_permits
+1
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
