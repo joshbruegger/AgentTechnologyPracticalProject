@@ -17,6 +17,7 @@ globals [
   sum-rentals
   sum-houses
   current-increase
+  old-tenant-count
 ]
 
 patches-own[
@@ -52,19 +53,7 @@ turtles-own [
 ;;                                                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to setup
-  clear-all
-  ;; too many clean up
-  set occupied 0
-  set not-occupied 0
-  set sum-rentals 0
-  set old-tenant-count 0
-  set sum-houses 0
-  set old-student-count 0
-
-  ;; Create map and districts
-  create-city
-
+to add-houses
   ;; Add rentals houses
   ask patches with [ is-house? = true ] [
     set is-rental? true
@@ -76,24 +65,49 @@ to setup
   ]
 
   ;; Paint occupied rentals red
-  ask max-n-of ((initially-occupied * sum-rentals) / 100) patches with [is-house? = true] [ green ] [ set pcolor red set occupied occupied + 1 ]
+  ask max-n-of ((initially-occupied * sum-rentals) / 100) patches with [is-house? = true] [ green ] [
+    set pcolor red
+    set occupied occupied + 1
+  ]
 
-  ;; Paint not students houses black so they are not included
-  ask max-n-of (((100 - students%) * occupied) / 100) patches with [is-house? = true] [ red ] [ 
-    set pcolor black 
-    set old-tenant-count old-tenant-count + 1 
+  ; Paint not students houses black so they are not included
+  ask max-n-of (((100 - students%) * occupied) / 100) patches with [is-house? = true] [ red ] [
+    set pcolor black
+    set old-tenant-count old-tenant-count + 1
     set is-rental? false
   ]
 
   ;; Paint students full houses red to populate initial students
-  ask max-n-of ((students% * occupied) / 100) patches with [ pcolor = red ] [ green ] [ set old-student-count old-student-count + 1 ]
+  ask max-n-of ((students% * occupied) / 100) patches with [ pcolor = red ] [ green ] [
+    set old-student-count old-student-count + 1
+  ]
 
   ;; Add stuff to rentals lmao
   ask max-n-of sum-rentals patches [ is-rental? ] [ populate-rentals ]
+end
+
+to setup
+  clear-all
+
+  ;; Initialize variables
+  set occupied 0
+  set not-occupied 0
+  set sum-rentals 0
+  set old-tenant-count 0
+  set sum-houses 0
+  set old-student-count 0
+
+  ;; Create map and districts
+  create-city
+
+  ;; Add houses to map
+  add-houses
+
+
+
+
 
   ;; Populate some red houses with old students
-  ;;create-turtles
-  ;;create-students old-student-count\
   create-turtles old-student-count [
     set color white
     set shape "circle"
@@ -226,7 +240,6 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to go
-
   ;; Initial students
   if ticks = 0 [
     ask turtles [
@@ -246,10 +259,10 @@ to go
         ]
         set total-students total-students + 1 ;;maybe + current-increase instead?
       ]
-    ]
-    if random-float 1 < 0.2 and random-float 1 < 0.5 [
-      die
-      set pcolor green
+      if random-float 1 < 0.2 and random-float 1 < 0.5 [
+        die
+        set pcolor green
+      ]
     ]
   ]
 
@@ -257,6 +270,7 @@ to go
     start
     ;;leave-groningen ;; This is the random part that makes people leave
   ]
+
   update
   tick
 end
@@ -280,13 +294,14 @@ to start
 
   if moved-in? = false and viewing? = false and done? = false [
     set done? true
-    ifelse (count turtles-on patch-here) > [capacity] of patch-here] [  ;;GUESSED how many tenants landlords talk to
-      move-to one-of other patches with [ pcolor = green or pcolor = yellow ] 
+    ifelse count turtles-on patch-here > [capacity] of patch-here [  ;;GUESSED how many tenants landlords talk to
+      move-to one-of other patches with [ pcolor = green or pcolor = yellow ]
     ] [
       set pcolor yellow
       set viewing? true
     ]
-  
+  ]
+
   if viewing? = true and done? = false [
     set done? true
     ifelse (max-price <= price) or (international? = true and racist? = true)
@@ -323,8 +338,6 @@ to start
     set pcolor green
   ]
 end
-
-
 
 
 @#$#@#$#@
