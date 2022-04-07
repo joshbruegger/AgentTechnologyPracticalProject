@@ -1,10 +1,17 @@
+;; Model by Melisa, Atakan, Zeynep, Josh.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                        ;;
+;;                        VARIABLES                       ;;
+;;                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 globals [
   ; too many clean up
   all-patches
   percent-successful
   total-students
   old-student-count
-  old-tenant-count
   occupied
   not-occupied
   sum-rentals
@@ -39,6 +46,12 @@ turtles-own [
   done?
 ]
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                        ;;
+;;                  SETUP FUNCTIONS                       ;;
+;;                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 to setup
   clear-all
   ;; too many clean up
@@ -66,7 +79,11 @@ to setup
   ask max-n-of ((initially-occupied * sum-rentals) / 100) patches with [is-house? = true] [ green ] [ set pcolor red set occupied occupied + 1 ]
 
   ;; Paint not students houses black so they are not included
-  ask max-n-of (((100 - students%) * occupied) / 100) patches with [is-house? = true] [ red ] [ set pcolor black set old-tenant-count old-tenant-count + 1 ]
+  ask max-n-of (((100 - students%) * occupied) / 100) patches with [is-house? = true] [ red ] [ 
+    set pcolor black 
+    set old-tenant-count old-tenant-count + 1 
+    set is-rental? false
+  ]
 
   ;; Paint students full houses red to populate initial students
   ask max-n-of ((students% * occupied) / 100) patches with [ pcolor = red ] [ green ] [ set old-student-count old-student-count + 1 ]
@@ -103,115 +120,10 @@ to setup
   reset-ticks
 end
 
-;;to create-new-students [ num
-
-;;end
-
-to go
-  if not any? patches with [ pcolor = green or pcolor = yellow ] [ stop ] ;;doesnt do anything now maybe add black too
-  if ticks >= 360 [ stop ]
-
-  ;; Initial students
-  if ticks = 0 [
-    ask turtles [
-      move-to one-of patches with [ pcolor = red ]
-    ]
-  ]
-
-  ;; Increase the student population
-  set current-increase  int((student-increase% * total-students) / 100)
-  if (ticks mod 15 = 1) and (ticks > 0) [
-    ask max-n-of current-increase turtles [ white ] [
-      hatch int ((student-increase% * total-students) / 100) [
-        ifelse any? patches with [ pcolor = green or pcolor = yellow ] [
-          move-to one-of patches with [ pcolor = green or pcolor = yellow ]
-          set moved-in? false
-          set viewing? true
-        ][
-          move-to one-of patches with [ pcolor = green or pcolor = yellow ]
-        ]
-      ]
-      set total-students total-students + 1 ;;maybe + current-increase instead??
-    ]
-  ]
-  ask turtles [
-    start
-    ;;leave-groningen ;; This is the random part that makes people leave
-  ]
-  update
-  tick
-end
-
-;; Simulates students leaving Groningen
-to leave-groningen
-  ;; Students leave Groningen every 6 months
-  if (ticks mod 60 = 1) and (ticks > 0) [
-    ;; %20 of AI students Graduate in 3 years
-    ;; random %50 of graduates leave
-    if random-float 1 < 0.2 and random-float 1 < 0.5 [
-      die
-    ]
-  ]
-end
-
-;; Start based on availability only
-to start
-  set days days + 1
-  if moved-in? = false and viewing? = false and done? = false [
-    set done? true
-    ifelse (count turtles-on patch pxcor pycor) > 10 [  ;;GUESSED how many tenants landlords talk to
-      move-to one-of other patches with [ pcolor = green or pcolor = yellow ] ;; should be able to move to green+1 too
-    ] [
-      set pcolor yellow
-      set viewing? true
-    ]
-  ]
-
-  if viewing? = true and done? = false [
-    set done? true
-    ifelse (max-price <= price) or (international? = true and racist? = true)
-            or (gender? = true and sexist? = true) or (age < age-limit) [
-      move-to one-of other patches with [ pcolor = green or pcolor = yellow ]
-      set viewing? false
-      set moved-in? false
-    ] [
-      set pcolor red
-      set viewing? false
-      set moved-in? true
-      set copy contract-length
-    ]
-  ]
-
-  if moved-in? = true and done? = false [
-    set done? true
-    set copy copy - 1
-    if copy < days [
-      set leaving? true
-    ]
-  ]
-
-  ;; i changed this entire thing
-  if leaving? = true and done? = false[
-    ifelse random-float 1 < 0.33 [
-      die
-    ] [
-      set done? true
-      move-to one-of other patches with [ pcolor = green ]
-      set moved-in? false
-      set leaving? false
-    ]
-    set pcolor green
-  ]
-end
-
-;; to leave-groningen need this!!
-
-;;to add-housing this too!!
-
 to update
-  let successful-students count patches with [ pcolor = red ] ;; maybe this is more successful tenants
+  let successful-students count turtles with [ moved-in? = true ] ;; maybe this is more successful tenants
   if total-students > 0 [
-    set percent-successful ( successful-students * 10 ) / total-students ;!!NEWER might be wrong
+    set percent-successful successful-students / total-students ;!!NEWER might be wrong
   ]
   ;;let successful-students count turtles with [moved-in? = true]
   ;;set percent-successful (successful-students / count turtles) * 100
@@ -263,7 +175,6 @@ to create-city
     ]
   ]
 
-
   ;; Remove district in border lines
   ask patches with [ pcolor = blue ] [ set district "border" ]
 
@@ -302,7 +213,120 @@ to populate-rentals
   if (age-limit < 17) or (age-limit > 30) [ set age-limit average-age-limit ] ;idk
   set contract-length random-normal 30 1 ;random length about a month now
 
+  set capacity abs random-poisson max-capacity
+  if capacity < 1 [ set capacity 1 ]
+
+
 end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                        ;;
+;;                  EVERY TICK FUNCTIONS                  ;;
+;;                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to go
+
+  ;; Initial students
+  if ticks = 0 [
+    ask turtles [
+      move-to one-of patches with [ pcolor = red ]
+    ]
+  ]
+
+  ;; Increase the student population
+  set current-increase  int((student-increase% * total-students) / 100)
+  if (ticks mod 15 = 1) and (ticks > 0) [
+    ask max-n-of current-increase turtles [ white ] [
+      hatch int ((student-increase% * total-students) / 100) [
+        if any? patches with [ pcolor = green or pcolor = yellow ] [
+          move-to one-of patches with [ pcolor = green or pcolor = yellow ]
+          set moved-in? false
+          set viewing? true
+        ]
+        set total-students total-students + 1 ;;maybe + current-increase instead?
+      ]
+    ]
+    if random-float 1 < 0.2 and random-float 1 < 0.5 [
+      die
+      set pcolor green
+    ]
+  ]
+
+  ask turtles [
+    start
+    ;;leave-groningen ;; This is the random part that makes people leave
+  ]
+  update
+  tick
+end
+
+;; Simulates students leaving Groningen
+to leave-groningen
+  ;; Students leave Groningen every 6 months
+  if (ticks mod 60 = 1) and (ticks > 0) [
+    ;; %20 of AI students Graduate in 3 years
+    ;; random %50 of graduates leave
+    if random-float 1 < 0.2 and random-float 1 < 0.5 [
+      die
+    ]
+  ]
+end
+
+;; Start based on availability only
+to start
+  set done? false
+  set days days + 1
+
+  if moved-in? = false and viewing? = false and done? = false [
+    set done? true
+    ifelse (count turtles-on patch-here) > [capacity] of patch-here] [  ;;GUESSED how many tenants landlords talk to
+      move-to one-of other patches with [ pcolor = green or pcolor = yellow ] 
+    ] [
+      set pcolor yellow
+      set viewing? true
+    ]
+  
+  if viewing? = true and done? = false [
+    set done? true
+    ifelse (max-price <= price) or (international? = true and racist? = true)
+            or (gender? = true and sexist? = true) or (age < age-limit) [
+      move-to one-of other patches with [ pcolor = green or pcolor = yellow ]
+      set viewing? false
+      set moved-in? false
+    ] [
+      set pcolor red
+      set viewing? false
+      set moved-in? true
+      set copy contract-length
+    ]
+  ]
+
+  if moved-in? = true and done? = false [
+    set done? true
+    set copy copy - 1
+    if copy < days [
+      set leaving? true
+    ]
+  ]
+
+  ;; i changed this entire thing
+  if leaving? = true and done? = false[
+    ifelse random-float 1 < 0.33 [
+      die
+    ] [
+      set done? true
+      move-to one-of other patches with [ pcolor = green ]
+      set moved-in? false
+      set leaving? false
+    ]
+    set pcolor green
+  ]
+end
+
+
+
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 390
@@ -542,17 +566,17 @@ student-increase%
 student-increase%
 0
 10
-7.0
+1.0
 1
 1
 NIL
 HORIZONTAL
 
 MONITOR
-279
-622
-336
-667
+196
+593
+253
+638
 rentals
 sum-rentals
 17
@@ -602,6 +626,75 @@ total-students
 17
 1
 11
+
+SLIDER
+418
+51
+590
+84
+max-capacity
+max-capacity
+0
+10
+4.0
+1
+1
+NIL
+HORIZONTAL
+
+PLOT
+740
+561
+940
+711
+plot 1
+NIL
+NIL
+1.0
+10.0
+0.0
+10.0
+true
+false
+"histogram [capacity] of patches" ""
+PENS
+"default" 1.0 1 -16777216 true "" "histogram [capacity] of patches"
+
+PLOT
+1069
+197
+1269
+347
+Student number
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot count turtles"
+
+PLOT
+1060
+364
+1260
+514
+plot 2
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot count turtles with [moved-in? = false]"
 
 @#$#@#$#@
 ## WHAT IS IT?
