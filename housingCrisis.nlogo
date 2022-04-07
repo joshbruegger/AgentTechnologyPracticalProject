@@ -1,3 +1,17 @@
+globals [
+  ; too many clean up
+  all-patches
+  percent-successful
+  total-students
+  old-student-count
+  old-tenant-count
+  occupied
+  not-occupied
+  sum-rentals
+  sum-houses
+  current-increase
+]
+
 patches-own[
   is-house?
   is-rental?
@@ -6,44 +20,229 @@ patches-own[
   price
   capacity
 
-  shared?
-  occupied?
   racist?
   sexist?
+  age-limit
+  contract-length
+]
 
+turtles-own [
+  max-price
+  international?
+  gender?
+  age
+  moved-in?
+  viewing?
+  leaving? ;; True is leaving the city
+  copy
+  days
+  done?
 ]
 
 to setup
   clear-all
+  ;; too many clean up
+  set occupied 0
+  set not-occupied 0
+  set sum-rentals 0
+  set old-tenant-count 0
+  set sum-houses 0
+  set old-student-count 0
 
-  ;; Set Districts
-  ask patches[
-    if pxcor < -200 [
-      set district "left"
+  ;; Create map and districts
+  create-city
+
+  ;; Add rentals houses
+  ask patches with [ is-house? = true ] [
+    set is-rental? true
+    if district = "left" [ decide-rentals 400 100 ] ;; first average rent, second density
+    if district = "right" [ decide-rentals 400 100 ] ;;  GUESSED NUMBERS FOR NOw
+    if district = "top" [ decide-rentals 600 100 ]
+    if district = "bottom" [ decide-rentals 350 105 ]
+    if district = "center" [ decide-rentals 650 125 ]
+  ]
+
+  ;; Paint occupied rentals red
+  ask max-n-of ((initially-occupied * sum-rentals) / 100) patches [ green ] [ set pcolor red set occupied occupied + 1 ]
+
+  ;; Paint not students houses black so they are not included
+  ask max-n-of (((100 - students%) * occupied) / 100) patches [ red ] [ set pcolor black set old-tenant-count old-tenant-count + 1 ]
+
+  ;; Paint students full houses red to populate initial students
+  ask max-n-of ((students% * occupied) / 100) patches with [ pcolor = red ] [ green ] [ set old-student-count old-student-count + 1 ]
+
+  ;; Add stuff to rentals lmao
+  ask max-n-of sum-rentals patches [ is-rental? ] [ populate-rentals ]
+
+  ;; Populate some red houses with old students
+  ;;create-turtles
+  ;;create-students old-student-count\
+  create-turtles old-student-count [
+    set color white
+    set shape "circle"
+    set max-price (350 + (random (400)))
+    set international? false
+    if random-float 1 < (100 / international%) [
+      set international? true
     ]
-    if pxcor > 200 [
-      set district "right"
+    set gender? false
+    if random-float 1 < (100 / gender%) [
+      set gender? true
     ]
-    if pycor > 200 [
-      ifelse pxcor < 0 [ set district "left" ]
-      [ set district "right" ]
-    ]
-    if pxcor >= -200 and pxcor <= 200 [
-      if pycor >= 0 and pycor <= 200 [
-        set district "top"
-      ]
-    ]
-    if pxcor >= -200 and pxcor <= 200 [
-      if pycor >= -300 and pycor <= 0 [
-        set district "bottom"
-      ]
-    ]
-    if pxcor > -100 and pxcor < 100 [
-      if pycor > -100 and pycor < 100 [
-        set district "center"
-      ]
+    set age random-normal age-average 10  ;;one-of (list (age-average + 10) (age-average - 10
+    if (age < 17) or (age > 30) [ set age age-average ]
+    set moved-in? true
+    set viewing? false
+    set leaving? false
+    set copy contract-length
+    set days random copy
+    set done? false
+  ]
+  set total-students total-students + old-student-count
+
+  reset-ticks
+end
+
+;;to create-new-students [ num
+
+;;end
+
+to go
+  if not any? patches with [ pcolor = green or pcolor = yellow ] [ stop ] ;;doesnt do anything now maybe add black too
+  if ticks >= 360 [ stop ]
+
+  ;; Initial students
+  if ticks = 0 [
+    ask turtles [
+      move-to one-of patches with [ pcolor = red ]
     ]
   ]
+
+  ;; Increase the student population
+  set current-increase  int((student-increase% * total-students) / 100)
+  if (ticks mod 15 = 1) and (ticks > 0) [
+    ask max-n-of current-increase turtles [ white ] [
+      hatch int ((student-increase% * total-students) / 100) [
+        ifelse any? patches with [ pcolor = green or pcolor = yellow ] [
+          move-to one-of patches with [ pcolor = green or pcolor = yellow ]
+          set moved-in? false
+          set viewing? true
+        ][
+          move-to one-of patches with [ pcolor = green or pcolor = yellow ]
+        ]
+      ]
+      set total-students total-students + 1 ;;maybe + current-increase instead??
+    ]
+  ]
+  ask turtles [
+    start
+    ;;leave-groningen ;; This is the random part that makes people leave
+  ]
+  update
+  tick
+end
+
+;; Simulates students leaving Groningen
+to leave-groningen
+  ;; Students leave Groningen every 6 months
+  if (ticks mod 60 = 1) and (ticks > 0) [
+    ;; %20 of AI students Graduate in 3 years
+    ;; random %50 of graduates leave
+    if random-float 1 < 0.2 and random-float 1 < 0.5 [
+      die
+    ]
+  ]
+end
+
+;; Start based on availability only
+to start
+  set days days + 1
+  if moved-in? = false and viewing? = false and done? = false [
+    set done? true
+    ifelse (count turtles-on patch pxcor pycor) > 10 [  ;;GUESSED how many tenants landlords talk to
+      move-to one-of other patches with [ pcolor = green or pcolor = yellow ] ;; should be able to move to green+1 too
+    ] [
+      set pcolor yellow
+      set viewing? true
+    ]
+  ]
+
+  if viewing? = true and done? = false [
+    set done? true
+    ifelse (max-price <= price) or (international? = true and racist? = true)
+            or (gender? = true and sexist? = true) or (age < age-limit) [
+      move-to one-of other patches with [ pcolor = green or pcolor = yellow ]
+      set viewing? false
+      set moved-in? false
+    ] [
+      set pcolor red
+      set viewing? false
+      set moved-in? true
+      set copy contract-length
+    ]
+  ]
+
+  if moved-in? = true and done? = false [
+    set done? true
+    set copy copy - 1
+    if copy < days [
+      set leaving? true
+    ]
+  ]
+
+  ;; i changed this entire thing
+  if leaving? = true and done? = false[
+    ifelse random-float 1 < 0.33 [
+      die
+    ] [
+      set done? true
+      move-to one-of other patches with [ pcolor = green ]
+      set moved-in? false
+      set leaving? false
+    ]
+    set pcolor green
+  ]
+end
+
+;; to leave-groningen need this!!
+
+;;to add-housing this too!!
+
+to update
+  let successful-students count patches with [ pcolor = red ] ;; maybe this is more successful tenants
+  if total-students > 0 [
+    set percent-successful ( successful-students * 10 ) / total-students ;!!NEWER might be wrong
+  ]
+  ;;let successful-students count turtles with [moved-in? = true]
+  ;;set percent-successful (successful-students / count turtles) * 100
+end
+
+;; Creates  the initial map based on Groningen
+to create-city
+  ;; Set Districts
+  ask patches [
+    if pxcor < -40 [
+      set district "left"
+    ]
+    if pxcor > 40 [
+      set district "right"
+    ]
+    if pycor > 40 [
+      ifelse pxcor < 0 [ set district "left" ] [ set district "right" ]
+    ]
+    if pxcor >= -40 and pxcor <= 40 and pycor >= 0 and pycor <= 40 [
+      set district "top"
+    ]
+    if pxcor >= -40 and pxcor <= 40 and pycor >= -60 and pycor <= 0[
+      set district "bottom"
+    ]
+    if pxcor > -20 and pxcor < 20 and pycor > -20 and pycor < 20[
+      set district "center"
+    ]
+  ]
+
+  ;;THIS LOCATION IS TOO RNADOM
+  set all-patches count patches
 
   ;; Paint district border
   ask patches [
@@ -53,70 +252,53 @@ to setup
   ]
 
   ;; Remove district in border lines
-  ask patches with [pcolor = blue] [ set district -1 ]
+  ask patches with [ pcolor = blue ] [ set district "border" ]
 
-
-  ;; create houses
-  ask patches [
+  ;; Create houses
+  ask patches with [ district != "border" ] [
     set is-house? false
-    if random 100 < house_density and pcolor != blue [
+    if ((house-density * all-patches) / 100) > sum-houses [
+      set sum-houses sum-houses + 1
       set is-house? true
     ]
   ]
 
-  ;; Add non-rentals houses
-  ask patches with [is-house?] [
+end
+
+;; All houses placed based on district density and priced based on district average price
+to decide-rentals [ num-prices num-densities ]
+  set price random-normal num-prices 200
+  set is-rental? false
+  if ((rental-density * sum-houses) / 100 ) > sum-rentals [
+    set sum-rentals sum-rentals + 1
     set is-rental? true
-    if district = "left" [
-      if random 100 > rental_density_left [
-        set is-rental? false
-      ]
-    ]
-    if district = "right" [
-      if random 100 > rental_density_right [
-        set is-rental? false
-      ]
-    ]
-    if district = "top" [
-      if random 100 > rental_density_top [
-        set is-rental? false
-      ]
-    ]
-    if district = "bottom" [
-      if random 100 > rental_density_bottom [
-        set is-rental? false
-      ]
-    ]
-    if district = "center" [
-      if random 100 > rental_density_center [
-        set is-rental? false
-      ]
-    ]
-  ]
-
-  ;; paint non-rentals
-  ask patches with [is-rental? = false] [ set pcolor gray]
-
-  ;; populate houses
-  ask patches with [is-rental? = true] [
-    set occupied? false
     set pcolor green
-    if random 100 < initially_occupied [
-      set occupied? true
-      set pcolor red
-    ]
   ]
+end
+
+to populate-rentals
+  set racist? false
+  if random-float 1 < (100 / nationality-discrimination%) [
+    set racist? true
+  ]
+  set sexist? false
+  if random-float 1 < (100 / sex-discrimination%) [
+    set sexist? true
+  ]
+  set age-limit one-of (list (average-age-limit + random 10) (average-age-limit - random 10)) ;idk
+  if (age-limit < 17) or (age-limit > 30) [ set age-limit average-age-limit ] ;idk
+  set contract-length random-normal 30 1 ;random length about a month now
 
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-392
-41
-1148
-584
+390
+97
+962
+510
 -1
 -1
-1.067332
+4.0
 1
 10
 1
@@ -126,10 +308,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--350
-350
--250
-250
+-70
+70
+-50
+50
 0
 0
 1
@@ -154,15 +336,15 @@ NIL
 1
 
 SLIDER
-21
-195
-196
-228
+18
+245
+193
+278
 international%
 international%
 0
 100
-29.0
+47.0
 1
 1
 NIL
@@ -170,86 +352,41 @@ HORIZONTAL
 
 SLIDER
 20
-336
+90
 197
-369
-house_density
-house_density
+123
+house-density
+house-density
 0
 100
-80.0
+75.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-699
-628
-927
-661
-nationality_discrimination%
-nationality_discrimination%
+17
+406
+245
+439
+nationality-discrimination%
+nationality-discrimination%
 0
 100
-57.0
+51.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-699
-666
-883
-699
-sex_discrimination%
-sex_discrimination%
-0
-100
-69.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-487
-634
-659
-667
-studio_density
-studio_density
-0
-100
-50.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-487
-674
-665
-707
-stud_house_density
-stud_house_density
-0
-100
-50.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-20
-369
-197
-402
-rental_density_left
-rental_density_left
+17
+439
+201
+472
+sex-discrimination%
+sex-discrimination%
 0
 100
 79.0
@@ -260,85 +397,18 @@ HORIZONTAL
 
 SLIDER
 20
-402
+123
 197
-435
-rental_density_right
-rental_density_right
+156
+rental-density
+rental-density
 0
 100
-36.0
+58.0
 1
 1
 NIL
 HORIZONTAL
-
-SLIDER
-20
-434
-197
-467
-rental_density_top
-rental_density_top
-0
-100
-69.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-20
-466
-197
-499
-rental_density_bottom
-rental_density_bottom
-0
-100
-66.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-20
-499
-197
-532
-rental_density_center
-rental_density_center
-0
-100
-84.0
-1
-1
-NIL
-HORIZONTAL
-
-INPUTBOX
-20
-131
-195
-191
-influx
-780.0
-1
-0
-Number
-
-INPUTBOX
-195
-131
-356
-191
-outflux
-0.0
-1
-0
-Number
 
 BUTTON
 193
@@ -359,44 +429,166 @@ NIL
 
 SLIDER
 20
-303
+156
 197
-336
-initially_occupied
-initially_occupied
+189
+initially-occupied
+initially-occupied
 0
 100
-80.0
+55.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-196
-195
-356
-228
-new_houses
-new_houses
+18
+213
+190
+246
+students%
+students%
 0
 100
-50.0
+11.0
 1
 1
 NIL
 HORIZONTAL
 
-SWITCH
-21
-229
-197
-262
-allow_permits
-allow_permits
+SLIDER
+18
+278
+190
+311
+gender%
+gender%
+0
+100
+62.0
 1
 1
--1000
+NIL
+HORIZONTAL
+
+PLOT
+16
+534
+216
+684
+percent-successful
+days
+students
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot percent-successful"
+
+SLIDER
+17
+472
+189
+505
+average-age-limit
+average-age-limit
+17
+30
+27.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+18
+311
+190
+344
+age-average
+age-average
+17
+40
+21.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+17
+373
+189
+406
+student-increase%
+student-increase%
+0
+10
+7.0
+1
+1
+NIL
+HORIZONTAL
+
+MONITOR
+279
+622
+336
+667
+rentals
+sum-rentals
+17
+1
+11
+
+MONITOR
+416
+687
+486
+732
+NIL
+occupied
+17
+1
+11
+
+MONITOR
+540
+595
+669
+640
+old-student-count
+old-student-count
+17
+1
+11
+
+MONITOR
+559
+697
+677
+742
+NIL
+current-increase
+17
+1
+11
+
+MONITOR
+413
+551
+515
+596
+total-students
+total-students
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
