@@ -63,10 +63,10 @@ to setup
   ]
 
   ;; Paint occupied rentals red
-  ask max-n-of ((initially-occupied * sum-rentals) / 100) patches [ green ] [ set pcolor red set occupied occupied + 1 ]
+  ask max-n-of ((initially-occupied * sum-rentals) / 100) patches with [is-house? = true] [ green ] [ set pcolor red set occupied occupied + 1 ]
 
   ;; Paint not students houses black so they are not included
-  ask max-n-of (((100 - students%) * occupied) / 100) patches [ red ] [ set pcolor black set old-tenant-count old-tenant-count + 1 ]
+  ask max-n-of (((100 - students%) * occupied) / 100) patches with [is-house? = true] [ red ] [ set pcolor black set old-tenant-count old-tenant-count + 1 ]
 
   ;; Paint students full houses red to populate initial students
   ask max-n-of ((students% * occupied) / 100) patches with [ pcolor = red ] [ green ] [ set old-student-count old-student-count + 1 ]
@@ -246,10 +246,23 @@ to create-city
 
   ;; Paint district border
   ask patches [
-    if count neighbors with [district != [district] of myself] > 0 [
+    if count neighbors with [district != [district] of myself] > 0 and pxcor < 69 and pxcor > -69 [
       set pcolor blue
     ]
   ]
+
+  ask patches with [ pcolor = blue] [
+    if pycor = 50 and count patches with [pxcor = [pxcor] of myself and pycor = [pycor] of myself - 1 and pcolor != blue] > 0[
+      set pcolor black
+    ]
+  ]
+
+  ask patches with [ pcolor = blue] [
+    if pycor = -50 and count patches with [pxcor = [pxcor] of myself and pycor = [pycor] of myself + 1 and pcolor != blue] > 0[
+      set pcolor black
+    ]
+  ]
+
 
   ;; Remove district in border lines
   ask patches with [ pcolor = blue ] [ set district "border" ]
