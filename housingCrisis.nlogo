@@ -61,39 +61,45 @@ to populate-houses
   ask n-of (count houses * initially-occupied / 100) houses [
     set population population + capacity
 
-    sprout capacity [
-      become-person
-    ]
-    set tenant-count capacity
+    sprout capacity [ become-person ]
+    ;;set tenant-count capacity REMOVED  IT
     set pcolor red
   ]
+
+  ;; ASK!!! so we use all the tenants and they all move out as frequently as students?
 end
 
 to become-person
-  set hidden? true
+  set hidden? false
+  set color white ;;REMOVE LATER
 
-  set max-price (350 + (random (400)))
+  set max-price (350 + (random (400))) ;; CHANGE THIS
 
   ifelse random 100 < students% [
     set is-student? true
-  ][set is-student? false]
+  ] [
+    set is-student? false
+  ]
 
   ifelse random 100 < international% [
     set international? true
-  ][set international? false]
+  ] [
+    set international? false
+  ]
 
   set gender? false
   if random 100 < gender% [
     set gender? true
   ]
-  set age random-normal age-average 10  ;;one-of (list (age-average + 10) (age-average - 10
+
+  set age random-normal age-average 10
   if (age < 17) or (age > 30) [ set age age-average ]
 
   set moved-in? true
   set viewing? false
   set leaving? false
-  set copy contract-length
-  set days random copy
+  set copy [ contract-length ] of patch-here
+  set days copy
   set done? false
 end
 
@@ -112,8 +118,6 @@ ask max-n-of (((100 - students%) * occupied) / 100) patches with [is-house? = tr
   set is-house? false
 ]
 
-
-
 ;; Paint students full houses red to populate initial students
 ask max-n-of ((students% * occupied) / 100) patches with [ pcolor = red ] [ green ] [
   set old-student-count old-student-count + 1
@@ -122,9 +126,12 @@ ask max-n-of ((students% * occupied) / 100) patches with [ pcolor = red ] [ gree
 ;; Populate some red houses with old students
 create-turtles old-student-count [
   set color white
-  set shape "circle"
+  ;; set shape "circle" defult is circle now
   set max-price (350 + (random (400)))
   set international? false
+  if random 100 < gender% [
+    set gender? true
+  ]
   if random-float 1 < (100 / international%) [
     set international? true
   ]
@@ -155,8 +162,6 @@ to setup
   ;; Initialize variables
   set population 0
   set occupied 0
-  set old-tenant-count 0
-  set old-student-count 0
 
   create-city
   add-houses
@@ -194,20 +199,24 @@ to become-house
 
   ;; Racism
   set racist? false
-  if random-float 1 < (100 / nationality-discrimination%) [
+  if random 100 < nationality-discrimination% [
     set racist? true
   ]
 
   ;; Sexism
   set sexist? false
-  if random-float 1 < (100 / sex-discrimination%) [
+  if random 100 < sex-discrimination% [
     set sexist? true
   ]
 
   ;; Age discrimination
   set age-limit one-of (list (average-age-limit + random 10) (average-age-limit - random 10)) ;idk
   if (age-limit < 17) or (age-limit > 30) [ set age-limit average-age-limit ] ;idk
-  set contract-length random-normal 30 1 ;random length about a month now
+
+  ;; Contract lengths
+  set contract-length int abs random-poisson 30
+  if contract-length < 1 [ set contract-length 1 ]
+  if contract-length > 60 [set capacity 60]
 end
 
 to-report houses
@@ -278,35 +287,27 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to go
-  ;; Initial students
-  if ticks = 0 [
-    ask turtles [
-      move-to one-of patches with [ pcolor = red ]
-    ]
-  ]
-
   ;; Increase the student population
   set current-increase  int((student-increase% * total-students) / 100)
   if (ticks mod 15 = 1) and (ticks > 0) [
     ask max-n-of current-increase turtles [ white ] [
-      hatch int ((student-increase% * total-students) / 100) [
+      hatch int ((student-increase% * total-students) / 100) [ ;;USE SPROUT HERE TOO
         if any? patches with [ pcolor = green or pcolor = yellow ] [
           move-to one-of patches with [ pcolor = green or pcolor = yellow ]
           set moved-in? false
           set viewing? true
         ]
-        set total-students total-students + 1 ;;maybe + current-increase instead?
+        set total-students total-students + 1 ;;maybe + current-increase instead
       ]
       if random-float 1 < 0.2 and random-float 1 < 0.5 [
         die
-        set pcolor green
+        set pcolor violet
       ]
     ]
   ]
 
   ask turtles [
     start
-    ;;leave-groningen ;; This is the random part that makes people leave
   ]
 
   update
@@ -314,12 +315,10 @@ to go
 end
 
 to update
-  let successful-students count turtles with [ moved-in? = true ] ;; maybe this is more successful tenants
+  let successful-students count turtles with [ moved-in? = true ]
   if total-students > 0 [
-    set percent-successful successful-students / total-students ;!!NEWER might be wrong
+    set percent-successful successful-students / total-students
   ]
-  ;;let successful-students count turtles with [moved-in? = true]
-  ;;set percent-successful (successful-students / count turtles) * 100
 end
 
 ;; Start based on availability only
@@ -329,7 +328,7 @@ to start
 
   if moved-in? = false and viewing? = false and done? = false [
     set done? true
-    ifelse count turtles-on patch-here > [capacity] of patch-here [  ;;GUESSED how many tenants landlords talk to
+    ifelse count turtles-on patch-here > [capacity] of patch-here [
       move-to one-of other patches with [ pcolor = green or pcolor = yellow ]
     ] [
       set pcolor yellow
@@ -442,7 +441,7 @@ house-density
 house-density
 0
 100
-75.0
+73.0
 1
 1
 NIL
@@ -457,7 +456,7 @@ nationality-discrimination%
 nationality-discrimination%
 0
 100
-51.0
+18.0
 1
 1
 NIL
@@ -472,7 +471,7 @@ sex-discrimination%
 sex-discrimination%
 0
 100
-79.0
+22.0
 1
 1
 NIL
@@ -504,7 +503,7 @@ initially-occupied
 initially-occupied
 0
 100
-55.0
+88.0
 1
 1
 NIL
@@ -519,7 +518,7 @@ students%
 students%
 0
 100
-11.0
+15.0
 1
 1
 NIL
@@ -567,7 +566,7 @@ average-age-limit
 average-age-limit
 17
 30
-27.0
+20.0
 1
 1
 NIL
@@ -604,10 +603,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-196
-593
-253
-638
+255
+600
+312
+645
 rentals
 count houses
 17
@@ -615,10 +614,10 @@ count houses
 11
 
 MONITOR
-416
-687
-486
-732
+386
+649
+456
+694
 NIL
 occupied
 17
@@ -626,21 +625,10 @@ occupied
 11
 
 MONITOR
-540
-595
-669
-640
-old-student-count
-old-student-count
-17
-1
-11
-
-MONITOR
-559
-697
-677
-742
+386
+599
+504
+644
 NIL
 current-increase
 17
@@ -648,10 +636,10 @@ current-increase
 11
 
 MONITOR
-413
-551
-515
-596
+386
+552
+488
+597
 total-students
 total-students
 17
@@ -674,11 +662,11 @@ NIL
 HORIZONTAL
 
 PLOT
-740
-561
-940
-711
-plot 1
+547
+551
+747
+701
+capacities
 NIL
 NIL
 1.0
@@ -736,7 +724,7 @@ permit-density
 permit-density
 0
 100
-50.0
+41.0
 1
 1
 NIL
@@ -750,12 +738,56 @@ SLIDER
 mean-capacity
 mean-capacity
 0
-100
-50.0
+10
+5.0
 1
 1
 NIL
 HORIZONTAL
+
+MONITOR
+387
+700
+516
+745
+old-student-count
+old-student-count
+17
+1
+11
+
+MONITOR
+255
+554
+312
+599
+sites
+count sites
+17
+1
+11
+
+MONITOR
+255
+646
+364
+691
+NIL
+population
+17
+1
+11
+
+MONITOR
+255
+691
+315
+736
+student
+count turtles with [ is-student? = true ]
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
