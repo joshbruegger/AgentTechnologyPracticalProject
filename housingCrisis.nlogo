@@ -7,8 +7,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 globals [
-  ; too many clean up
   sites ;; Everything that is not a border, can be a house or a place to build a house in
+  population ;; How many people live in the city
 
   percent-successful
   total-students
@@ -20,7 +20,7 @@ globals [
 
 patches-own[
   is-house?
-  has-permit? ;; Licence permitting more than 2 households
+  tenant-count
 
   district
   price
@@ -34,10 +34,13 @@ patches-own[
 ]
 
 turtles-own [
-  max-price
   international?
   gender?
+  is-student?
   age
+
+  max-price
+
   moved-in?
   viewing?
   leaving? ;; True is leaving the city
@@ -52,49 +55,93 @@ turtles-own [
 ;;                                                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
 to populate-houses
+  ;; Hatch initial population
+  ask n-of (count houses * initially-occupied / 100) houses [
+    set population population + capacity
 
-  ;; Paint occupied rentals red
-  ask n-of (count houses * initially-occupied / 100) patches with [is-house? = true and pcolor = green] [
+    sprout capacity [
+      become-person
+    ]
+    set tenant-count capacity
     set pcolor red
-    set occupied occupied + 1
   ]
+end
 
-  ; Paint not students houses black so they are not included
-  ask max-n-of (((100 - students%) * occupied) / 100) patches with [is-house? = true] [ red ] [
-    set pcolor black
-    set old-tenant-count old-tenant-count + 1
-    set is-house? false
-  ]
+to become-person
+  set hidden? true
 
-  ;; Paint students full houses red to populate initial students
-  ask max-n-of ((students% * occupied) / 100) patches with [ pcolor = red ] [ green ] [
-    set old-student-count old-student-count + 1
-  ]
+  set max-price (350 + (random (400)))
 
-  ;; Populate some red houses with old students
-  create-turtles old-student-count [
-    set color white
-    set shape "circle"
-    set max-price (350 + (random (400)))
-    set international? false
-    if random-float 1 < (100 / international%) [
-      set international? true
-    ]
-    set gender? false
-    if random-float 1 < (100 / gender%) [
-      set gender? true
-    ]
-    set age random-normal age-average 10  ;;one-of (list (age-average + 10) (age-average - 10
-    if (age < 17) or (age > 30) [ set age age-average ]
-    set moved-in? true
-    set viewing? false
-    set leaving? false
-    set copy contract-length
-    set days random copy
-    set done? false
+  ifelse random 100 < students% [
+    set is-student? true
+  ][set is-student? false]
+
+  ifelse random 100 < international% [
+    set international? true
+  ][set international? false]
+
+  set gender? false
+  if random 100 < gender% [
+    set gender? true
   ]
-  set total-students total-students + old-student-count
+  set age random-normal age-average 10  ;;one-of (list (age-average + 10) (age-average - 10
+  if (age < 17) or (age > 30) [ set age age-average ]
+
+  set moved-in? true
+  set viewing? false
+  set leaving? false
+  set copy contract-length
+  set days random copy
+  set done? false
+end
+
+to populate-houses-old
+
+;; Paint occupied rentals red
+ask n-of (count houses * initially-occupied / 100) patches with [is-house? = true and pcolor = green] [
+  set pcolor red
+  set occupied occupied + 1
+]
+
+; Paint not students houses black so they are not included
+ask max-n-of (((100 - students%) * occupied) / 100) patches with [is-house? = true] [ red ] [
+  set pcolor black
+  set old-tenant-count old-tenant-count + 1
+  set is-house? false
+]
+
+
+
+;; Paint students full houses red to populate initial students
+ask max-n-of ((students% * occupied) / 100) patches with [ pcolor = red ] [ green ] [
+  set old-student-count old-student-count + 1
+]
+
+;; Populate some red houses with old students
+create-turtles old-student-count [
+  set color white
+  set shape "circle"
+  set max-price (350 + (random (400)))
+  set international? false
+  if random-float 1 < (100 / international%) [
+    set international? true
+  ]
+  set gender? false
+  if random-float 1 < (100 / gender%) [
+    set gender? true
+  ]
+  set age random-normal age-average 10  ;;one-of (list (age-average + 10) (age-average - 10
+  if (age < 17) or (age > 30) [ set age age-average ]
+  set moved-in? true
+  set viewing? false
+  set leaving? false
+  set copy contract-length
+  set days random copy
+  set done? false
+]
+set total-students total-students + old-student-count
 
 end
 
@@ -103,7 +150,10 @@ to setup
   clear-all
   reset-ticks
 
+  set-default-shape turtles "circle"
+
   ;; Initialize variables
+  set population 0
   set occupied 0
   set old-tenant-count 0
   set old-student-count 0
@@ -130,21 +180,17 @@ to become-house
   if capacity < 1 [ set capacity 1 ]
   if capacity > max-capacity [set capacity max-capacity]
 
+  ;; Tenant count
+  set tenant-count 0
+
   ;; Price based on district
-  ;; TODO: base on capacitY and if shared or not
+  ;; TODO: base on capacity and if shared or not
   let priceSD 200
   if district = "left" [ set price random-normal 400 priceSD ] ;; first average rent, second density
   if district = "right" [ set price random-normal 400 priceSD ] ;;  GUESSED NUMBERS FOR NOw
   if district = "top" [ set price random-normal 600 priceSD ]
   if district = "bottom" [ set price random-normal 350 priceSD ]
   if district = "center" [ set price random-normal 650 priceSD ]
-
-  ;; Issue permit
-  ifelse (capacity > 2) and (random 100 <= permit-density) [
-    set has-permit? true
-  ][
-    set has-permit? false
-  ]
 
   ;; Racism
   set racist? false
@@ -166,6 +212,10 @@ end
 
 to-report houses
   report sites with [is-house? = true]
+end
+
+to-report full?
+  report tenant-count = capacity
 end
 
 ;; Creates  the initial map based on Groningen
@@ -369,10 +419,10 @@ NIL
 1
 
 SLIDER
-18
-245
-193
-278
+17
+285
+192
+318
 international%
 international%
 0
@@ -384,10 +434,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-20
-90
-197
-123
+21
+75
+198
+108
 house-density
 house-density
 0
@@ -446,10 +496,10 @@ NIL
 1
 
 SLIDER
-20
-156
-197
-189
+21
+108
+198
+141
 initially-occupied
 initially-occupied
 0
@@ -461,10 +511,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-18
-213
-190
-246
+17
+253
+189
+286
 students%
 students%
 0
@@ -476,10 +526,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-18
-278
-190
-311
+17
+318
+189
+351
 gender%
 gender%
 0
@@ -524,10 +574,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-18
-311
-190
-344
+17
+351
+189
+384
 age-average
 age-average
 17
@@ -539,10 +589,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-17
-373
-189
-406
+18
+207
+190
+240
 student-increase%
 student-increase%
 0
@@ -678,10 +728,10 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot count turtles with [moved-in? = false]"
 
 SLIDER
-227
-157
-399
-190
+21
+139
+193
+172
 permit-density
 permit-density
 0
@@ -693,10 +743,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-618
-54
-790
-87
+590
+52
+762
+85
 mean-capacity
 mean-capacity
 0
