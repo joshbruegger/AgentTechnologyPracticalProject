@@ -12,13 +12,13 @@ globals [
   percent-successful
   total-students
   old-student-count
-  occupied
-  current-increase
+  occupied ;maybe just use let where
+  current-increase ;used?
   old-tenant-count
 ]
 
 patches-own[
-  is-house?
+  house?
   has-permit? ;; A house w/ permit allows more than 2 households
   tenant-count
 
@@ -38,10 +38,9 @@ turtles-own [
   gender?
   age
 
-  max-price
+  budget
 
   moved-in?
-  viewing?
   leaving? ;; True is leaving the city
   copy
   days
@@ -85,7 +84,6 @@ to populate-houses
       set moved-in? true
     ]
 
-
     set tenant-count capacity
     set pcolor red
   ]
@@ -95,16 +93,30 @@ end
 to become-student
   set hidden? true
 
-  set max-price (350 + (random (400))) ;; CHANGE THIS
+  let budget-level random 101
 
-  ifelse random 100 < international% [
+  ifelse budget-level < 40 [
+    set budget (random-normal 354 54)
+  ][
+    ifelse budget-level < 91 [
+      set budget (random-normal 492 74)
+    ][
+      ifelse budget-level < 98 [
+        set budget (random-normal 704 94)
+      ][
+        set budget (random-normal 1000 114)
+      ]
+    ]
+  ]
+
+  ifelse random 101 <= international% [
     set international? true
   ] [
     set international? false
   ]
 
   set gender? false
-  if random 100 < gender% [
+  if random 101 <= gender% [
     set gender? true
   ]
 
@@ -112,7 +124,6 @@ to become-student
   if (age < 17) or (age > 30) [ set age age-average ]
 
   set moved-in? false
-  set viewing? false
   set leaving? false
   set copy [ contract-length ] of patch-here
   set days copy
@@ -127,11 +138,11 @@ to add-houses
 end
 
 to become-house
-  set is-house? true
+  set house? true
   set pcolor green
 
   ;; Issue permit
-  ifelse random 100 < permit-density [
+  ifelse random 101 <= permit-density [
     set has-permit? true
   ] [
     set has-permit? false
@@ -162,13 +173,13 @@ to become-house
 
   ;; Racism
   set racist? false
-  if random 100 < nationality-discrimination% [
+  if random 101 <= nationality-discrimination% [
     set racist? true
   ]
 
   ;; Sexism
   set sexist? false
-  if random 100 < sex-discrimination% [
+  if random 101 <= sex-discrimination% [
     set sexist? true
   ]
 
@@ -177,13 +188,13 @@ to become-house
   if (age-limit < 17) or (age-limit > 30) [ set age-limit average-age-limit ] ;idk
 
   ;; Contract lengths
-  set contract-length int abs random-poisson 30
-  if contract-length < 1 [ set contract-length 1 ]
-  if contract-length > 60 [set capacity 60]
+  set contract-length int abs random-poisson 52
+  if contract-length < 4 [ set contract-length 4 ]
+  if contract-length > 104 [ set contract-length 104 ]
 end
 
 to-report houses
-  report sites with [is-house? = true]
+  report sites with [house? = true]
 end
 
 to-report full?
@@ -236,7 +247,7 @@ to create-city
   ;; Remove district in border lines
   ask patches with [ pcolor = blue ] [
     set district "border"
-    set is-house? false
+    set house? false
     ]
 
   ;; Add non district into agentset called sites for better handling
@@ -248,6 +259,16 @@ end
 ;;                  EVERY TICK FUNCTIONS                  ;;
 ;;                                                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to go
+  immigrate
+  move
+  emigrate
+  recolor-patches
+
+  update
+  tick
+end
 
 to-report immigration-weekly [rate]
   ;; 52 weeks in a year
@@ -281,67 +302,61 @@ to emigrate
   ]
 end
 
-to move
-  ask turtles [
-    set done? false
-    set days days + 1
-
-    if moved-in? = false and viewing? = false and done? = false [
-      set done? true
-      ifelse count turtles-on patch-here > [capacity] of patch-here [
-        move-to one-of other patches with [ pcolor = green or pcolor = yellow ]
-      ] [
-        ;set pcolor yellow
-        set viewing? true
-      ]
-    ]
-
-    if viewing? = true and done? = false [
-      set done? true
-      ifelse (max-price <= price) or (international? = true and racist? = true)
-              or (gender? = true and sexist? = true) or (age < age-limit) [
-        move-to one-of other patches with [ pcolor = green or pcolor = yellow ]
-        set viewing? false
-        set moved-in? false
-      ] [
-        ;set pcolor red
-        set viewing? false
-        set moved-in? true
-        set copy contract-length
-      ]
-    ]
-
-    if moved-in? = true and done? = false [
-      set done? true
-      set copy copy - 1
-      if copy < days [
-        set leaving? true
-      ]
-    ]
-
-    ;; i changed this entire thing
-    if leaving? = true and done? = false[
-      ifelse random-float 1 < 1 [
-        ;;die
-      ] [
-        set done? true
-        move-to one-of other patches with [ pcolor = green ]
-        set moved-in? false
-        set leaving? false
-      ]
-      set pcolor green
-    ]
+to-report can-move [student house]
+  ifelse ( [budget] of student < [price] of house) or
+         ( [international?] of student = true and [racist?] of house = true ) or
+         ( [gender?] of student = true and [sexist?] of house = true ) or
+         ( [age] of student < [age-limit] of house ) [
+    report false
+  ] [
+    report true
   ]
 end
 
-to go
-  immigrate
-  move
-  emigrate
-  recolor-patches
+to move
+  ask turtles [
+    ifelse moved-in? = true [
+      ;; Update moved-in time
+      set copy copy - 1
 
-  update
-  tick
+      ;; Relocate if contract is about to exipre
+      if copy < 30 [
+
+        ;; Contract expired, become homeless
+        if copy = 0 [
+          set moved-in? false
+          move-to one-of other houses with [ full? = false ]
+        ]
+
+        ;; Search for new house
+        let possibleHouse one-of houses with [ full? = false ]
+        if can-move self possibleHouse [
+          ask patch-here [ set tenant-count tenant-count - 1]
+          move-to possibleHouse
+          set copy [contract-length] of patch-here
+          ask patch-here [ set tenant-count tenant-count + 1]
+        ]
+      ]
+
+    ][
+      ;; Homeless turtle
+
+      ;; Move if not on available house
+      if [ full? ] of patch-here = true [
+        move-to one-of houses with [ full? = false ]
+      ]
+
+      ;; Move in if you compatible with patch
+      ifelse can-move self patch-here [
+        set moved-in? true
+        set copy [contract-length] of patch-here
+        ask patch-here [ set tenant-count tenant-count + 1 ]
+      ] [
+        ;; Move because cannot move to current patch
+        move-to one-of other houses with [ full? = false ]
+      ]
+    ]
+  ]
 end
 
 to update
@@ -356,7 +371,7 @@ to recolor-patches
     ifelse full? = true [
       set pcolor red
     ][
-      ifelse count turtles-here with [ viewing? = true] > 0 [
+      ifelse count turtles-here with [ moved-in? = false ] > 0 [
         set pcolor yellow
       ][
         set pcolor green
@@ -365,7 +380,6 @@ to recolor-patches
     ]
   ]
 end
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 390
@@ -435,7 +449,7 @@ house-density
 house-density
 0
 100
-100.0
+10.0
 1
 1
 NIL
@@ -544,12 +558,12 @@ students
 0.0
 10.0
 0.0
-10.0
+100.0
 true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot percent-successful"
+"default" 1.0 0 -16777216 true "" "plot count turtles with [ moved-in? = true ] / count turtles * 100"
 
 SLIDER
 17
@@ -590,7 +604,7 @@ annual-immigration-rate
 annual-immigration-rate
 0
 1
-0.59
+1.0
 0.01
 1
 NIL
@@ -778,7 +792,7 @@ MONITOR
 315
 736
 student
-count turtles with [ is-student? = true ]
+count turtles
 17
 1
 11
@@ -792,7 +806,7 @@ emigration-rate
 emigration-rate
 0
 1
-0.73
+0.0
 0.01
 1
 NIL
