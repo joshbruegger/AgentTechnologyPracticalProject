@@ -8,21 +8,19 @@
 
 globals [
   ; too many clean up
-  all-patches
+  sites ;; Everything that is not a border, can be a house or a place to build a house in
+
   percent-successful
   total-students
   old-student-count
   occupied
-  not-occupied
-  sum-rentals
-  sum-houses
   current-increase
   old-tenant-count
 ]
 
 patches-own[
   is-house?
-  is-rental?
+  has-permit? ;; Licence permitting more than 2 households
 
   district
   price
@@ -31,6 +29,7 @@ patches-own[
   racist?
   sexist?
   age-limit
+
   contract-length
 ]
 
@@ -53,19 +52,10 @@ turtles-own [
 ;;                                                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to add-houses
-  ;; Add rentals houses
-  ask patches with [ is-house? = true ] [
-    set is-rental? true
-    if district = "left" [ decide-rentals 400 100 ] ;; first average rent, second density
-    if district = "right" [ decide-rentals 400 100 ] ;;  GUESSED NUMBERS FOR NOw
-    if district = "top" [ decide-rentals 600 100 ]
-    if district = "bottom" [ decide-rentals 350 105 ]
-    if district = "center" [ decide-rentals 650 125 ]
-  ]
+to populate-houses
 
   ;; Paint occupied rentals red
-  ask max-n-of ((initially-occupied * sum-rentals) / 100) patches with [is-house? = true] [ green ] [
+  ask n-of (count houses * initially-occupied / 100) patches with [is-house? = true and pcolor = green] [
     set pcolor red
     set occupied occupied + 1
   ]
@@ -74,38 +64,13 @@ to add-houses
   ask max-n-of (((100 - students%) * occupied) / 100) patches with [is-house? = true] [ red ] [
     set pcolor black
     set old-tenant-count old-tenant-count + 1
-    set is-rental? false
+    set is-house? false
   ]
 
   ;; Paint students full houses red to populate initial students
   ask max-n-of ((students% * occupied) / 100) patches with [ pcolor = red ] [ green ] [
     set old-student-count old-student-count + 1
   ]
-
-  ;; Add stuff to rentals lmao
-  ask max-n-of sum-rentals patches [ is-rental? ] [ populate-rentals ]
-end
-
-to setup
-  clear-all
-
-  ;; Initialize variables
-  set occupied 0
-  set not-occupied 0
-  set sum-rentals 0
-  set old-tenant-count 0
-  set sum-houses 0
-  set old-student-count 0
-
-  ;; Create map and districts
-  create-city
-
-  ;; Add houses to map
-  add-houses
-
-
-
-
 
   ;; Populate some red houses with old students
   create-turtles old-student-count [
@@ -131,16 +96,76 @@ to setup
   ]
   set total-students total-students + old-student-count
 
-  reset-ticks
 end
 
-to update
-  let successful-students count turtles with [ moved-in? = true ] ;; maybe this is more successful tenants
-  if total-students > 0 [
-    set percent-successful successful-students / total-students ;!!NEWER might be wrong
+to setup
+  ;; Clear everything
+  clear-all
+  reset-ticks
+
+  ;; Initialize variables
+  set occupied 0
+  set old-tenant-count 0
+  set old-student-count 0
+
+  create-city
+  add-houses
+  populate-houses
+
+end
+
+to add-houses
+  ;; Create houses based on house-density
+  ask n-of (house-density / 100 * count sites) sites [
+    become-house
   ]
-  ;;let successful-students count turtles with [moved-in? = true]
-  ;;set percent-successful (successful-students / count turtles) * 100
+end
+
+to become-house
+  set is-house? true
+  set pcolor green
+
+  ;; Capacity
+  set capacity abs random-poisson mean-capacity
+  if capacity < 1 [ set capacity 1 ]
+  if capacity > max-capacity [set capacity max-capacity]
+
+  ;; Price based on district
+  ;; TODO: base on capacitY and if shared or not
+  let priceSD 200
+  if district = "left" [ set price random-normal 400 priceSD ] ;; first average rent, second density
+  if district = "right" [ set price random-normal 400 priceSD ] ;;  GUESSED NUMBERS FOR NOw
+  if district = "top" [ set price random-normal 600 priceSD ]
+  if district = "bottom" [ set price random-normal 350 priceSD ]
+  if district = "center" [ set price random-normal 650 priceSD ]
+
+  ;; Issue permit
+  ifelse (capacity > 2) and (random 100 <= permit-density) [
+    set has-permit? true
+  ][
+    set has-permit? false
+  ]
+
+  ;; Racism
+  set racist? false
+  if random-float 1 < (100 / nationality-discrimination%) [
+    set racist? true
+  ]
+
+  ;; Sexism
+  set sexist? false
+  if random-float 1 < (100 / sex-discrimination%) [
+    set sexist? true
+  ]
+
+  ;; Age discrimination
+  set age-limit one-of (list (average-age-limit + random 10) (average-age-limit - random 10)) ;idk
+  if (age-limit < 17) or (age-limit > 30) [ set age-limit average-age-limit ] ;idk
+  set contract-length random-normal 30 1 ;random length about a month now
+end
+
+to-report houses
+  report sites with [is-house? = true]
 end
 
 ;; Creates  the initial map based on Groningen
@@ -167,22 +192,19 @@ to create-city
     ]
   ]
 
-  ;;THIS LOCATION IS TOO RNADOM
-  set all-patches count patches
-
   ;; Paint district border
   ask patches [
     if count neighbors with [district != [district] of myself] > 0 and pxcor < 69 and pxcor > -69 [
       set pcolor blue
     ]
   ]
-
+  ;; Fix borders top
   ask patches with [ pcolor = blue] [
     if pycor = 50 and count patches with [pxcor = [pxcor] of myself and pycor = [pycor] of myself - 1 and pcolor != blue] > 0[
       set pcolor black
     ]
   ]
-
+  ;; Fix borders bottom
   ask patches with [ pcolor = blue] [
     if pycor = -50 and count patches with [pxcor = [pxcor] of myself and pycor = [pycor] of myself + 1 and pcolor != blue] > 0[
       set pcolor black
@@ -190,47 +212,13 @@ to create-city
   ]
 
   ;; Remove district in border lines
-  ask patches with [ pcolor = blue ] [ set district "border" ]
-
-  ;; Create houses
-  ask patches with [ district != "border" ] [
+  ask patches with [ pcolor = blue ] [
+    set district "border"
     set is-house? false
-    if ((house-density * all-patches) / 100) > sum-houses [
-      set sum-houses sum-houses + 1
-      set is-house? true
     ]
-  ]
 
-end
-
-;; All houses placed based on district density and priced based on district average price
-to decide-rentals [ num-prices num-densities ]
-  set price random-normal num-prices 200
-  set is-rental? false
-  if ((rental-density * sum-houses) / 100 ) > sum-rentals [
-    set sum-rentals sum-rentals + 1
-    set is-rental? true
-    set pcolor green
-  ]
-end
-
-to populate-rentals
-  set racist? false
-  if random-float 1 < (100 / nationality-discrimination%) [
-    set racist? true
-  ]
-  set sexist? false
-  if random-float 1 < (100 / sex-discrimination%) [
-    set sexist? true
-  ]
-  set age-limit one-of (list (average-age-limit + random 10) (average-age-limit - random 10)) ;idk
-  if (age-limit < 17) or (age-limit > 30) [ set age-limit average-age-limit ] ;idk
-  set contract-length random-normal 30 1 ;random length about a month now
-
-  set capacity abs random-poisson max-capacity
-  if capacity < 1 [ set capacity 1 ]
-
-
+  ;; Add non district into agentset called sites for better handling
+  set sites patches with [district != "border"]
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -275,16 +263,13 @@ to go
   tick
 end
 
-;; Simulates students leaving Groningen
-to leave-groningen
-  ;; Students leave Groningen every 6 months
-  if (ticks mod 60 = 1) and (ticks > 0) [
-    ;; %20 of AI students Graduate in 3 years
-    ;; random %50 of graduates leave
-    if random-float 1 < 0.2 and random-float 1 < 0.5 [
-      die
-    ]
+to update
+  let successful-students count turtles with [ moved-in? = true ] ;; maybe this is more successful tenants
+  if total-students > 0 [
+    set percent-successful successful-students / total-students ;!!NEWER might be wrong
   ]
+  ;;let successful-students count turtles with [moved-in? = true]
+  ;;set percent-successful (successful-students / count turtles) * 100
 end
 
 ;; Start based on availability only
@@ -338,8 +323,6 @@ to start
     set pcolor green
   ]
 end
-
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 390
@@ -440,21 +423,6 @@ sex-discrimination%
 0
 100
 79.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-20
-123
-197
-156
-rental-density
-rental-density
-0
-100
-58.0
 1
 1
 NIL
@@ -591,7 +559,7 @@ MONITOR
 253
 638
 rentals
-sum-rentals
+count houses
 17
 1
 11
@@ -708,6 +676,36 @@ false
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "" "plot count turtles with [moved-in? = false]"
+
+SLIDER
+227
+157
+399
+190
+permit-density
+permit-density
+0
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+618
+54
+790
+87
+mean-capacity
+mean-capacity
+0
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
