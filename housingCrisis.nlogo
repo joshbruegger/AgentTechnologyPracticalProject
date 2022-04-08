@@ -6,21 +6,11 @@
 ;;                                                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-globals [
-  sites ;; Everything that is not a border, can be a house or a place to build a house in
-
-  percent-successful
-  total-students
-  old-student-count
-  occupied ;maybe just use let where
-  current-increase ;used?
-  old-tenant-count
-]
+globals [ sites ] ;; Everything that is not a border, can be a house or a place to build a house in
 
 patches-own[
   house?
   has-permit? ;; A house w/ permit allows more than 2 households
-  tenant-count
 
   district
   price
@@ -28,6 +18,7 @@ patches-own[
 
   racist?
   sexist?
+  sexist-against?
   age-limit
 
   contract-length
@@ -35,23 +26,39 @@ patches-own[
 
 turtles-own [
   international?
-  gender?
+  sex?
   age
 
   budget
 
   moved-in?
   leaving? ;; True is leaving the city
-  copy
-  days
+  weeks-left
   done?
 ]
+
+to-report houses
+  report sites with [house? = true]
+end
+
+to-report tenant-count
+  report count turtles-here with [moved-in? = true]
+end
+
+to-report population
+  report count turtles
+end
+
+to-report full?
+  report tenant-count = capacity
+end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                                                        ;;
 ;;                  SETUP FUNCTIONS                       ;;
 ;;                                                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 
 to setup
@@ -63,17 +70,15 @@ to setup
 
   ;; Initialize variables
 
-  set occupied 0
 
   create-city
   add-houses
   populate-houses
+  recolor-patches
 
 end
 
-to-report population
-  report count turtles
-end
+
 
 to populate-houses
   ;; Hatch initial population
@@ -83,9 +88,6 @@ to populate-houses
       become-student
       set moved-in? true
     ]
-
-    set tenant-count capacity
-    set pcolor red
   ]
 
 end
@@ -115,9 +117,9 @@ to become-student
     set international? false
   ]
 
-  set gender? false
+  set sex? false
   if random 101 <= gender% [
-    set gender? true
+    set sex? true
   ]
 
   set age random-normal age-average 10
@@ -125,8 +127,7 @@ to become-student
 
   set moved-in? false
   set leaving? false
-  set copy [ contract-length ] of patch-here
-  set days copy
+  set weeks-left [ contract-length ] of patch-here
   set done? false
 end
 
@@ -153,9 +154,6 @@ to become-house
   if capacity < 1 [ set capacity 1 ]
   if capacity > max-capacity [set capacity max-capacity]
 
-  ;; Tenant count
-  set tenant-count 0
-
   ;; Price based on district
   ;; TODO: base on capacity and if shared or not
   let priceSD 200
@@ -178,9 +176,15 @@ to become-house
   ]
 
   ;; Sexism
-  set sexist? false
-  if random 101 <= sex-discrimination% [
+  ifelse random 101 <= sex-discrimination% [
     set sexist? true
+    ifelse random 101 <= 50 [
+      set sexist-against? true
+    ][
+      set sexist-against? false
+    ]
+  ][
+    set sexist? false
   ]
 
   ;; Age discrimination
@@ -193,13 +197,7 @@ to become-house
   if contract-length > 104 [ set contract-length 104 ]
 end
 
-to-report houses
-  report sites with [house? = true]
-end
 
-to-report full?
-  report tenant-count = capacity
-end
 
 ;; Creates  the initial map based on Groningen
 to create-city
@@ -261,12 +259,11 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to go
+  emigrate
   immigrate
   move
-  emigrate
   recolor-patches
 
-  update
   tick
 end
 
@@ -297,15 +294,14 @@ end
 
 to emigrate
   ask n-of (immigration-weekly emigration-rate) turtles [
-    ask patch-here [ set tenant-count tenant-count - 1 ]
     die
   ]
 end
 
 to-report can-move [student house]
   ifelse ( [budget] of student < [price] of house) or
-         ( [international?] of student = true and [racist?] of house = true ) or
-         ( [gender?] of student = true and [sexist?] of house = true ) or
+         ( [racist?] of house = true and [international?] of student = true ) or
+         ( [sexist?] of house = true and [sex?] of student = [sexist-against?] of house ) or
          ( [age] of student < [age-limit] of house ) [
     report false
   ] [
@@ -317,13 +313,13 @@ to move
   ask turtles [
     ifelse moved-in? = true [
       ;; Update moved-in time
-      set copy copy - 1
+      set weeks-left weeks-left - 1
 
       ;; Relocate if contract is about to exipre
-      if copy < 30 [
+      if weeks-left < 30 [
 
         ;; Contract expired, become homeless
-        if copy = 0 [
+        if weeks-left = 0 [
           set moved-in? false
           move-to one-of other houses with [ full? = false ]
         ]
@@ -331,10 +327,8 @@ to move
         ;; Search for new house
         let possibleHouse one-of houses with [ full? = false ]
         if can-move self possibleHouse [
-          ask patch-here [ set tenant-count tenant-count - 1]
           move-to possibleHouse
-          set copy [contract-length] of patch-here
-          ask patch-here [ set tenant-count tenant-count + 1]
+          set weeks-left [contract-length] of patch-here
         ]
       ]
 
@@ -349,20 +343,12 @@ to move
       ;; Move in if you compatible with patch
       ifelse can-move self patch-here [
         set moved-in? true
-        set copy [contract-length] of patch-here
-        ask patch-here [ set tenant-count tenant-count + 1 ]
+        set weeks-left [contract-length] of patch-here
       ] [
         ;; Move because cannot move to current patch
         move-to one-of other houses with [ full? = false ]
       ]
     ]
-  ]
-end
-
-to update
-  let successful-students count turtles with [ moved-in? = true ]
-  if count turtles > 0 [
-    set percent-successful successful-students / count turtles
   ]
 end
 
