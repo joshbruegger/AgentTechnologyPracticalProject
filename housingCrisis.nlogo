@@ -6,7 +6,10 @@
 ;;                                                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-globals [ sites ] ;; Everything that is not a border, can be a house or a place to build a house in
+globals [
+  sites ;; Everything that is not a border, can be a house or a place to build a house in
+  end-of-year-population
+]
 
 patches-own[
   house?
@@ -66,14 +69,12 @@ to setup
   clear-all
   reset-ticks
 
-  ;; Initialize variables
-
-
   create-city
   add-houses
   populate-houses
   recolor-patches
 
+  set end-of-year-population population
 end
 
 
@@ -263,6 +264,7 @@ to go
   recolor-patches
 
   tick
+  if ticks mod 52 = 0 [ set end-of-year-population population ]
 end
 
 to-report immigration-weekly [rate]
@@ -274,12 +276,11 @@ to-report immigration-weekly [rate]
   ;; 2s in feb
 
   let weekOfYear (ticks mod 52)
-  let peakOne 5
-  let peakTwo 33
-  let curve (e ^ (-((weekOfYear - peakOne) ^ 2) / (1.9)) + e ^ (-((weekOfYear - peakTwo) ^ 2) / (20))) + 1
-  let aoc 87.6
-
-  report round ((rate * population) / aoc * curve)
+  let peakOne 6
+  let peakTwo 31
+  let curve (e ^ (-((weekOfYear - peakOne) ^ 2) / (4)) + e ^ (-((weekOfYear - peakTwo) ^ 2) / (70)) * 2) + 0.1
+  let aoc 38.3
+  report floor ((rate * end-of-year-population) * curve / aoc)
 
 end
 
@@ -588,7 +589,7 @@ annual-immigration-rate
 annual-immigration-rate
 0
 1
-1.0
+0.5
 0.01
 1
 NIL
@@ -601,39 +602,6 @@ MONITOR
 645
 rentals
 count houses
-17
-1
-11
-
-MONITOR
-386
-649
-456
-694
-NIL
-occupied
-17
-1
-11
-
-MONITOR
-386
-599
-504
-644
-NIL
-current-increase
-17
-1
-11
-
-MONITOR
-386
-552
-488
-597
-total-students
-total-students
 17
 1
 11
@@ -694,7 +662,7 @@ PLOT
 364
 1260
 514
-plot 2
+Homeless count
 NIL
 NIL
 0.0
@@ -716,7 +684,7 @@ permit-density
 permit-density
 0
 100
-41.0
+38.0
 1
 1
 NIL
@@ -736,17 +704,6 @@ mean-capacity
 1
 NIL
 HORIZONTAL
-
-MONITOR
-387
-700
-516
-745
-old-student-count
-old-student-count
-17
-1
-11
 
 MONITOR
 255
@@ -790,7 +747,7 @@ emigration-rate
 emigration-rate
 0
 1
-0.0
+0.5
 0.01
 1
 NIL
@@ -801,7 +758,7 @@ PLOT
 552
 1031
 702
-plot 1
+Emigration per week
 NIL
 NIL
 0.0
@@ -819,7 +776,7 @@ PLOT
 556
 1249
 706
-plot 3
+Immigration per week
 NIL
 NIL
 0.0
