@@ -291,12 +291,12 @@ end
 ;;                                                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to immigrate
+to go
   ;; Increase the student population
-  set current-increase  int((immigration-rate * total-students) / 100)
+  set current-increase  int((student-increase% * total-students) / 100)
   if (ticks mod 15 = 1) and (ticks > 0) [
     ask max-n-of current-increase turtles [ white ] [
-      hatch int ((immigration-rate * total-students) / 100) [ ;;USE SPROUT HERE TOO
+      hatch int ((student-increase% * total-students) / 100) [ ;;USE SPROUT HERE TOO
         if any? patches with [ pcolor = green or pcolor = yellow ] [
           move-to one-of patches with [ pcolor = green or pcolor = yellow ]
           set moved-in? false
@@ -310,68 +310,10 @@ to immigrate
       ]
     ]
   ]
-end
 
-to emigrate
-end
-
-to move
   ask turtles [
-    set done? false
-    set days days + 1
-
-    if moved-in? = false and viewing? = false and done? = false [
-      set done? true
-      ifelse count turtles-on patch-here > [capacity] of patch-here [
-        move-to one-of other patches with [ pcolor = green or pcolor = yellow ]
-      ] [
-        set pcolor yellow
-        set viewing? true
-      ]
-    ]
-
-    if viewing? = true and done? = false [
-      set done? true
-      ifelse (max-price <= price) or (international? = true and racist? = true)
-              or (gender? = true and sexist? = true) or (age < age-limit) [
-        move-to one-of other patches with [ pcolor = green or pcolor = yellow ]
-        set viewing? false
-        set moved-in? false
-      ] [
-        set pcolor red
-        set viewing? false
-        set moved-in? true
-        set copy contract-length
-      ]
-    ]
-
-    if moved-in? = true and done? = false [
-      set done? true
-      set copy copy - 1
-      if copy < days [
-        set leaving? true
-      ]
-    ]
-
-    ;; i changed this entire thing
-    if leaving? = true and done? = false[
-      ifelse random-float 1 < 0.33 [
-        die
-      ] [
-        set done? true
-        move-to one-of other patches with [ pcolor = green ]
-        set moved-in? false
-        set leaving? false
-      ]
-      set pcolor green
-    ]
+    start
   ]
-end
-
-to go
-  immigrate
-  move
-  emigrate
 
   update
   tick
@@ -384,6 +326,57 @@ to update
   ]
 end
 
+;; Start based on availability only
+to start
+  set done? false
+  set days days + 1
+
+  if moved-in? = false and viewing? = false and done? = false [
+    set done? true
+    ifelse count turtles-on patch-here > [capacity] of patch-here [
+      move-to one-of other patches with [ pcolor = green or pcolor = yellow ]
+    ] [
+      set pcolor yellow
+      set viewing? true
+    ]
+  ]
+
+  if viewing? = true and done? = false [
+    set done? true
+    ifelse (max-price <= price) or (international? = true and racist? = true)
+            or (gender? = true and sexist? = true) or (age < age-limit) [
+      move-to one-of other patches with [ pcolor = green or pcolor = yellow ]
+      set viewing? false
+      set moved-in? false
+    ] [
+      set pcolor red
+      set viewing? false
+      set moved-in? true
+      set copy contract-length
+    ]
+  ]
+
+  if moved-in? = true and done? = false [
+    set done? true
+    set copy copy - 1
+    if copy < days [
+      set leaving? true
+    ]
+  ]
+
+  ;; i changed this entire thing
+  if leaving? = true and done? = false[
+    ifelse random-float 1 < 0.33 [
+      die
+    ] [
+      set done? true
+      move-to one-of other patches with [ pcolor = green ]
+      set moved-in? false
+      set leaving? false
+    ]
+    set pcolor green
+  ]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 390
@@ -800,21 +793,6 @@ count turtles with [ is-student? = true ]
 17
 1
 11
-
-SLIDER
-233
-256
-405
-289
-emigration-rate
-emigration-rate
-0
-100
-50.0
-1
-1
-NIL
-HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
