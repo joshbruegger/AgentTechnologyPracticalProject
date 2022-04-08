@@ -15,8 +15,6 @@ globals [
   occupied
   current-increase
   old-tenant-count
-  feb-weekly-immigration
-  sep-weekly-immigration
 ]
 
 patches-own[
@@ -56,10 +54,27 @@ turtles-own [
 ;;                                                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+to setup
+  ;; Clear everything
+  clear-all
+  reset-ticks
+
+  set-default-shape turtles "circle"
+
+  ;; Initialize variables
+
+  set occupied 0
+
+  create-city
+  add-houses
+  populate-houses
+
+end
+
 to-report population
   report count turtles
 end
-
 
 to populate-houses
   ;; Hatch initial population
@@ -102,72 +117,6 @@ to become-student
   set copy [ contract-length ] of patch-here
   set days copy
   set done? false
-end
-
-to populate-houses-old
-
-;; Paint occupied rentals red
-ask n-of (count houses * initially-occupied / 100) patches with [is-house? = true and pcolor = green] [
-  set pcolor red
-  set occupied occupied + 1
-]
-
-; Paint not students houses black so they are not included
-ask max-n-of (((100 - students%) * occupied) / 100) patches with [is-house? = true] [ red ] [
-  set pcolor black
-  set old-tenant-count old-tenant-count + 1
-  set is-house? false
-]
-
-;; Paint students full houses red to populate initial students
-ask max-n-of ((students% * occupied) / 100) patches with [ pcolor = red ] [ green ] [
-  set old-student-count old-student-count + 1
-]
-
-;; Populate some red houses with old students
-create-turtles old-student-count [
-  set color white
-  ;; set shape "circle" defult is circle now
-  set max-price (350 + (random (400)))
-  set international? false
-  if random 100 < gender% [
-    set gender? true
-  ]
-  if random-float 1 < (100 / international%) [
-    set international? true
-  ]
-  set gender? false
-  if random-float 1 < (100 / gender%) [
-    set gender? true
-  ]
-  set age random-normal age-average 10  ;;one-of (list (age-average + 10) (age-average - 10
-  if (age < 17) or (age > 30) [ set age age-average ]
-  set moved-in? true
-  set viewing? false
-  set leaving? false
-  set copy contract-length
-  set days random copy
-  set done? false
-]
-set total-students total-students + old-student-count
-
-end
-
-to setup
-  ;; Clear everything
-  clear-all
-  reset-ticks
-
-  set-default-shape turtles "circle"
-
-  ;; Initialize variables
-
-  set occupied 0
-
-  create-city
-  add-houses
-  populate-houses
-
 end
 
 to add-houses
@@ -325,33 +274,11 @@ to immigrate
   ]
 end
 
-
-to allah
-  ;; Increase the student population
-  set current-increase  int((annual-immigration-rate * total-students) / 100)
-  if (ticks mod 15 = 1) and (ticks > 0) [
-    ask max-n-of current-increase turtles [ white ] [
-      hatch int ((annual-immigration-rate * total-students) / 100) [ ;;USE SPROUT HERE TOO
-        if any? patches with [ pcolor = green or pcolor = yellow ] [
-          move-to one-of patches with [ pcolor = green or pcolor = yellow ]
-          set moved-in? false
-          set viewing? true
-        ]
-        set total-students total-students + 1 ;;maybe + current-increase instead
-      ]
-      if random-float 1 < 0.2 and random-float 1 < 0.5 [
-        die
-        set pcolor violet
-  ]
-    ]
-      ]
-end
-
 to emigrate
   ask n-of (immigration-weekly emigration-rate) turtles [
+    ask patch-here [ set tenant-count tenant-count - 1 ]
     die
   ]
-
 end
 
 to move
@@ -364,7 +291,7 @@ to move
       ifelse count turtles-on patch-here > [capacity] of patch-here [
         move-to one-of other patches with [ pcolor = green or pcolor = yellow ]
       ] [
-        set pcolor yellow
+        ;set pcolor yellow
         set viewing? true
       ]
     ]
@@ -377,7 +304,7 @@ to move
         set viewing? false
         set moved-in? false
       ] [
-        set pcolor red
+        ;set pcolor red
         set viewing? false
         set moved-in? true
         set copy contract-length
@@ -411,6 +338,7 @@ to go
   immigrate
   move
   emigrate
+  recolor-patches
 
   update
   tick
@@ -422,6 +350,22 @@ to update
     set percent-successful successful-students / count turtles
   ]
 end
+
+to recolor-patches
+  ask houses [
+    ifelse full? = true [
+      set pcolor red
+    ][
+      ifelse count turtles-here with [ viewing? = true] > 0 [
+        set pcolor yellow
+      ][
+        set pcolor green
+
+      ]
+    ]
+  ]
+end
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 390
