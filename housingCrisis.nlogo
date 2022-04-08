@@ -8,7 +8,6 @@
 
 globals [
   sites ;; Everything that is not a border, can be a house or a place to build a house in
-  population ;; How many people live in the city
 
   percent-successful
   total-students
@@ -16,6 +15,8 @@ globals [
   occupied
   current-increase
   old-tenant-count
+  feb-weekly-immigration
+  sep-weekly-immigration
 ]
 
 patches-own[
@@ -55,13 +56,20 @@ turtles-own [
 ;;                                                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+to-report population
+  report count turtles
+end
+
 
 to populate-houses
   ;; Hatch initial population
   ask n-of (count houses * initially-occupied / 100) houses [
-    set population population + capacity
 
-    sprout capacity [ become-student ]
+    sprout capacity [
+      become-student
+      set moved-in? true
+    ]
+
 
     set tenant-count capacity
     set pcolor red
@@ -88,7 +96,7 @@ to become-student
   set age random-normal age-average 10
   if (age < 17) or (age > 30) [ set age age-average ]
 
-  set moved-in? true
+  set moved-in? false
   set viewing? false
   set leaving? false
   set copy [ contract-length ] of patch-here
@@ -153,7 +161,7 @@ to setup
   set-default-shape turtles "circle"
 
   ;; Initialize variables
-  set population 0
+
   set occupied 0
 
   create-city
@@ -185,11 +193,6 @@ to become-house
   if capacity < 1 [ set capacity 1 ]
   if capacity > max-capacity [set capacity max-capacity]
 
-  ;; Cut capacity based on permit
-  if capacity > 2 and has-permit? = false [
-    set capacity 2
-  ]
-
   ;; Tenant count
   set tenant-count 0
 
@@ -201,6 +204,12 @@ to become-house
   if district = "top" [ set price random-normal 600 priceSD ]
   if district = "bottom" [ set price random-normal 350 priceSD ]
   if district = "center" [ set price random-normal 650 priceSD ]
+
+  ;; Cut capacity based on permit and update price
+  if capacity > 2 and has-permit? = false [
+    set price price * capacity / 2
+    set capacity 2
+  ]
 
   ;; Racism
   set racist? false
@@ -291,12 +300,38 @@ end
 ;;                                                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+to-report immigration-weekly [rate]
+  ;; 52 weeks in a year
+  ;; 1 tick = 1 week
+
+  ;; 2 peaks: feb > sept
+  ;; 4x in sept
+  ;; 2s in feb
+
+  let weekOfYear (ticks mod 52)
+  let peakOne 5
+  let peakTwo 33
+  let curve (e ^ (-((weekOfYear - peakOne) ^ 2) / (1.9)) + e ^ (-((weekOfYear - peakTwo) ^ 2) / (20))) + 1
+  let aoc 87.6
+
+  report round ((rate * population) / aoc * curve)
+
+end
+
 to immigrate
+  ;; Rewrite this?
+  create-turtles (immigration-weekly annual-immigration-rate) [
+    become-student
+  ]
+end
+
+
+to allah
   ;; Increase the student population
-  set current-increase  int((immigration-rate * total-students) / 100)
+  set current-increase  int((annual-immigration-rate * total-students) / 100)
   if (ticks mod 15 = 1) and (ticks > 0) [
     ask max-n-of current-increase turtles [ white ] [
-      hatch int ((immigration-rate * total-students) / 100) [ ;;USE SPROUT HERE TOO
+      hatch int ((annual-immigration-rate * total-students) / 100) [ ;;USE SPROUT HERE TOO
         if any? patches with [ pcolor = green or pcolor = yellow ] [
           move-to one-of patches with [ pcolor = green or pcolor = yellow ]
           set moved-in? false
@@ -307,12 +342,16 @@ to immigrate
       if random-float 1 < 0.2 and random-float 1 < 0.5 [
         die
         set pcolor violet
-      ]
-    ]
   ]
+    ]
+      ]
 end
 
 to emigrate
+  ask n-of (immigration-weekly emigration-rate) turtles [
+    die
+  ]
+
 end
 
 to move
@@ -355,8 +394,8 @@ to move
 
     ;; i changed this entire thing
     if leaving? = true and done? = false[
-      ifelse random-float 1 < 0.33 [
-        die
+      ifelse random-float 1 < 1 [
+        ;;die
       ] [
         set done? true
         move-to one-of other patches with [ pcolor = green ]
@@ -379,11 +418,10 @@ end
 
 to update
   let successful-students count turtles with [ moved-in? = true ]
-  if total-students > 0 [
-    set percent-successful successful-students / total-students
+  if count turtles > 0 [
+    set percent-successful successful-students / count turtles
   ]
 end
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 390
@@ -602,14 +640,14 @@ HORIZONTAL
 SLIDER
 18
 207
-190
+233
 240
-immigration-rate
-immigration-rate
+annual-immigration-rate
+annual-immigration-rate
 0
-10
-1.0
 1
+0.59
+0.01
 1
 NIL
 HORIZONTAL
@@ -809,12 +847,48 @@ SLIDER
 emigration-rate
 emigration-rate
 0
-100
-50.0
 1
+0.73
+0.01
 1
 NIL
 HORIZONTAL
+
+PLOT
+831
+552
+1031
+702
+plot 1
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot immigration-weekly emigration-rate"
+
+PLOT
+1049
+556
+1249
+706
+plot 3
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot immigration-weekly annual-immigration-rate"
 
 @#$#@#$#@
 ## WHAT IS IT?
