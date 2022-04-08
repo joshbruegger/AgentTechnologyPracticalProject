@@ -35,7 +35,6 @@ turtles-own [
   moved-in?
   leaving? ;; True is leaving the city
   weeks-left
-  done?
 ]
 
 to-report houses
@@ -122,7 +121,6 @@ to become-student
   set moved-in? false
   set leaving? false
   set weeks-left [ contract-length ] of patch-here
-  set done? false
 end
 
 to add-houses
@@ -149,10 +147,9 @@ to become-house
   if capacity > max-capacity [set capacity max-capacity]
 
   ;; Price based on district
-  ;; TODO: base on capacity and if shared or not
   let priceSD 200
-  if district = "left" [ set price random-normal 400 priceSD ] ;; first average rent, second density
-  if district = "right" [ set price random-normal 400 priceSD ] ;;  GUESSED NUMBERS FOR NOw
+  if district = "left" [ set price random-normal 400 priceSD ]
+  if district = "right" [ set price random-normal 400 priceSD ]
   if district = "top" [ set price random-normal 600 priceSD ]
   if district = "bottom" [ set price random-normal 350 priceSD ]
   if district = "center" [ set price random-normal 650 priceSD ]
@@ -252,7 +249,7 @@ to go
   emigrate
   immigrate
   move
-  recolor-patches
+  recolor-patches ;; Runs very slowly!!!
 
   tick
   if ticks mod 52 = 0 [ set end-of-year-population population ]
@@ -263,8 +260,6 @@ to-report immigration-weekly [rate]
   ;; 1 tick = 1 week
 
   ;; 2 peaks: feb > sept
-  ;; 4x in sept
-  ;; 2s in feb
 
   let weekOfYear (ticks mod 52)
   let peakOne 6
@@ -276,7 +271,6 @@ to-report immigration-weekly [rate]
 end
 
 to immigrate
-  ;; Rewrite this?
   create-turtles (immigration-weekly annual-immigration-rate) [
     become-student
   ]
@@ -377,8 +371,8 @@ GRAPHICS-WINDOW
 70
 -50
 50
-0
-0
+1
+1
 1
 ticks
 30.0
@@ -409,7 +403,7 @@ international%
 international%
 0
 100
-47.0
+32.0
 1
 1
 NIL
@@ -424,7 +418,7 @@ house-density
 house-density
 0
 100
-10.0
+80.0
 1
 1
 NIL
@@ -439,7 +433,7 @@ nationality-discrimination%
 nationality-discrimination%
 0
 100
-18.0
+25.0
 1
 1
 NIL
@@ -454,7 +448,7 @@ sex-discrimination%
 sex-discrimination%
 0
 100
-22.0
+10.0
 1
 1
 NIL
@@ -486,22 +480,7 @@ initially-occupied
 initially-occupied
 0
 100
-61.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-17
-253
-189
-286
-students%
-students%
-0
-100
-15.0
+80.0
 1
 1
 NIL
@@ -516,31 +495,11 @@ gender%
 gender%
 0
 100
-62.0
+50.0
 1
 1
 NIL
 HORIZONTAL
-
-PLOT
-16
-534
-216
-684
-percent-successful
-days
-students
-0.0
-10.0
-0.0
-100.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" "plot count turtles with [ moved-in? = true ] / count turtles * 100"
-
-
 
 SLIDER
 18
@@ -551,17 +510,17 @@ annual-immigration-rate
 annual-immigration-rate
 0
 1
-0.5
+0.11
 0.01
 1
 NIL
 HORIZONTAL
 
 MONITOR
-255
-600
-312
-645
+226
+641
+283
+686
 rentals
 count houses
 17
@@ -577,18 +536,18 @@ max-capacity
 max-capacity
 0
 10
-4.0
+5.0
 1
 1
 NIL
 HORIZONTAL
 
 PLOT
-547
-551
-747
-701
-capacities
+525
+533
+773
+683
+Distibution of house capacity
 NIL
 NIL
 1.0
@@ -602,10 +561,10 @@ PENS
 "default" 1.0 1 -16777216 true "" "histogram [capacity] of patches"
 
 PLOT
-1069
-197
-1269
-347
+293
+536
+493
+686
 Student number
 NIL
 NIL
@@ -620,22 +579,22 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot count turtles"
 
 PLOT
-1060
-364
-1260
-514
-Homeless count
+21
+537
+221
+687
+Homeless percentage
 NIL
 NIL
 0.0
 10.0
 0.0
-10.0
+2.0
 true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot count turtles with [moved-in? = false]"
+"default" 1.0 0 -16777216 true "" "plot count turtles with [moved-in? = false] / count turtles * 100"
 
 SLIDER
 21
@@ -646,32 +605,32 @@ permit-density
 permit-density
 0
 100
-38.0
+75.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-590
-52
-762
-85
+589
+51
+761
+84
 mean-capacity
 mean-capacity
 0
 10
-5.0
+2.0
 1
 1
 NIL
 HORIZONTAL
 
 MONITOR
-255
-554
-312
-599
+226
+595
+283
+640
 sites
 count sites
 17
@@ -679,65 +638,36 @@ count sites
 11
 
 MONITOR
-255
-646
-364
-691
-NIL
+343
+676
+454
+721
+student number
 population
 17
 1
 11
 
-MONITOR
-255
-691
-315
-736
-student
-count turtles
-17
-1
-11
-
 SLIDER
-233
-256
-405
-289
+18
+240
+190
+273
 emigration-rate
 emigration-rate
 0
 1
-0.5
+0.1
 0.01
 1
 NIL
 HORIZONTAL
 
 PLOT
-831
-552
-1031
-702
-Emigration per week
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" "plot immigration-weekly emigration-rate"
-
-PLOT
-1049
-556
-1249
-706
+783
+535
+983
+685
 Immigration per week
 NIL
 NIL
