@@ -22,7 +22,6 @@ patches-own[
   racist?
   sexist?
   sexist-against?
-  age-limit
 
   contract-length
 ]
@@ -30,7 +29,6 @@ patches-own[
 turtles-own [
   international?
   sex?
-  age
 
   budget
 
@@ -121,9 +119,6 @@ to become-student
     set sex? true
   ]
 
-  set age random-normal age-average 10
-  if (age < 17) or (age > 30) [ set age age-average ]
-
   set moved-in? false
   set leaving? false
   set weeks-left [ contract-length ] of patch-here
@@ -185,10 +180,6 @@ to become-house
   ][
     set sexist? false
   ]
-
-  ;; Age discrimination
-  set age-limit one-of (list (average-age-limit + random 10) (average-age-limit - random 10)) ;idk
-  if (age-limit < 17) or (age-limit > 30) [ set age-limit average-age-limit ] ;idk
 
   ;; Contract lengths
   set contract-length int abs random-poisson 52
@@ -300,8 +291,7 @@ end
 to-report can-move [student house]
   ifelse ( [budget] of student < [price] of house) or
          ( [racist?] of house = true and [international?] of student = true ) or
-         ( [sexist?] of house = true and [sex?] of student = [sexist-against?] of house ) or
-         ( [age] of student < [age-limit] of house ) [
+         ( [sexist?] of house = true and [sex?] of student = [sexist-against?] of house ) [
     report false
   ] [
     report true
@@ -550,35 +540,7 @@ false
 PENS
 "default" 1.0 0 -16777216 true "" "plot count turtles with [ moved-in? = true ] / count turtles * 100"
 
-SLIDER
-17
-472
-189
-505
-average-age-limit
-average-age-limit
-17
-30
-20.0
-1
-1
-NIL
-HORIZONTAL
 
-SLIDER
-17
-351
-189
-384
-age-average
-age-average
-17
-40
-21.0
-1
-1
-NIL
-HORIZONTAL
 
 SLIDER
 18
