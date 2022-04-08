@@ -66,8 +66,6 @@ to setup
   clear-all
   reset-ticks
 
-  set-default-shape turtles "circle"
-
   ;; Initialize variables
 
 
@@ -357,11 +355,11 @@ to recolor-patches
     ifelse full? = true [
       set pcolor red
     ][
-      ifelse count turtles-here with [ moved-in? = false ] > 0 [
-        set pcolor yellow
+      let viewing-turtles count turtles-here with [ moved-in? = false ]
+      ifelse viewing-turtles > 0 [
+        set pcolor yellow + viewing-turtles
       ][
         set pcolor green
-
       ]
     ]
   ]
