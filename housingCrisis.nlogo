@@ -62,7 +62,6 @@ end
 
 
 to setup
-  ;; Clear everything
   clear-all
   reset-ticks
 
@@ -75,9 +74,8 @@ to setup
 end
 
 
-
+;; Hatch initial population
 to populate-houses
-  ;; Hatch initial population
   ask n-of (count houses * initially-occupied / 100) houses [
 
     sprout capacity [
@@ -88,20 +86,34 @@ to populate-houses
 
 end
 
+;; Make patch a student with a randomized budget
 to become-student
-  set hidden? true
+  set hidden? true ;; Hide the turtle
+
+  ;; Accumulated probabilites for each budget level
+  ;; 51% -> 51%
+  ;; 40% -> 91%
+  ;; 7%  -> 98%
+  ;; 2%  -> 100%
 
   let budget-level random 101
 
-  ifelse budget-level < 40 [
+  ifelse budget-level < 51 [
+    ;; 51% likelyhood of student being average
     set budget (random-normal 354 54)
   ][
+    ;; else
     ifelse budget-level < 91 [
+      ;; 40% likelyhood of student being poor
       set budget (random-normal 492 74)
     ][
+      ;; else
       ifelse budget-level < 98 [
+        ;; 7% likelyhood of student being rich
         set budget (random-normal 704 94)
       ][
+        ;;else
+        ;; 2% likelyhood of student being very rich
         set budget (random-normal 1000 114)
       ]
     ]
@@ -113,9 +125,10 @@ to become-student
     set international? false
   ]
 
-  set sex? false
-  if random 101 <= gender% [
+  ifelse random 101 <= gender% [
     set sex? true
+  ][
+    set sex? false
   ]
 
   set moved-in? false
@@ -258,7 +271,6 @@ end
 to-report immigration-weekly [rate]
   ;; 52 weeks in a year
   ;; 1 tick = 1 week
-
   ;; 2 peaks: feb > sept
 
   let weekOfYear (ticks mod 52)
@@ -266,8 +278,8 @@ to-report immigration-weekly [rate]
   let peakTwo 31
   let curve (e ^ (-((weekOfYear - peakOne) ^ 2) / (4)) + e ^ (-((weekOfYear - peakTwo) ^ 2) / (70)) * 2) + 0.1
   let aoc 38.3
-  report floor ((rate * end-of-year-population) * curve / aoc)
 
+  report floor ((rate * end-of-year-population) * curve / aoc)
 end
 
 to immigrate
