@@ -6,9 +6,12 @@
 ;;                                                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+extensions [array]
+
 globals [
   sites ;; Everything that is not a border, can be a house or a place to build a house in
   end-of-year-population
+  curve
 ]
 
 patches-own[
@@ -33,7 +36,6 @@ turtles-own [
   budget
 
   moved-in?
-  leaving? ;; True is leaving the city
   weeks-left
 ]
 
@@ -70,9 +72,25 @@ to setup
   populate-houses
   recolor-patches
 
+  set curve array:from-list n-values 53 [0]
+  calculateCurve
+
   set end-of-year-population population
 end
 
+to calculateCurve
+  ;; 52 weeks in a year
+  ;; 1 tick = 1 week
+  ;; 2 peaks: feb > sept
+
+  let peakOne 6
+  let peakTwo 31
+  let auc 38.3
+
+  foreach n-values 53 [ i -> i ] [
+     i -> array:set curve i ((e ^ (-((i + 1 - peakOne) ^ 2) / (4)) + e ^ (-((i + 1 - peakTwo) ^ 2) / (70)) * 2) + 0.1 ) / auc
+  ]
+end
 
 ;; Hatch initial population
 to populate-houses
@@ -98,17 +116,17 @@ to become-student
 
   let budget-level random 101
 
-  ifelse budget-level < 51 [
+  ifelse budget-level <= 51 [
     ;; 51% likelyhood of student being average
     set budget (random-normal 354 54)
   ][
     ;; else
-    ifelse budget-level < 91 [
+    ifelse budget-level <= 91 [
       ;; 40% likelyhood of student being poor
       set budget (random-normal 492 74)
     ][
       ;; else
-      ifelse budget-level < 98 [
+      ifelse budget-level <= 98 [
         ;; 7% likelyhood of student being rich
         set budget (random-normal 704 94)
       ][
@@ -121,7 +139,7 @@ to become-student
 
   ifelse random 101 <= international% [
     set international? true
-  ] [
+  ][
     set international? false
   ]
 
@@ -132,7 +150,6 @@ to become-student
   ]
 
   set moved-in? false
-  set leaving? false
   set weeks-left [ contract-length ] of patch-here
 end
 
@@ -150,7 +167,7 @@ to become-house
   ;; Issue permit
   ifelse random 101 <= permit-density [
     set has-permit? true
-  ] [
+  ][
     set has-permit? false
   ]
 
@@ -262,24 +279,16 @@ to go
   emigrate
   immigrate
   move
-  recolor-patches ;; Runs very slowly!!!
+  ; move2
+  ;recolor-patches ;; Runs very slowly!!!
 
   tick
   if ticks mod 52 = 0 [ set end-of-year-population population ]
 end
 
 to-report immigration-weekly [rate]
-  ;; 52 weeks in a year
-  ;; 1 tick = 1 week
-  ;; 2 peaks: feb > sept
-
-  let weekOfYear (ticks mod 52)
-  let peakOne 6
-  let peakTwo 31
-  let curve (e ^ (-((weekOfYear - peakOne) ^ 2) / (4)) + e ^ (-((weekOfYear - peakTwo) ^ 2) / (70)) * 2) + 0.1
-  let aoc 38.3
-
-  report floor ((rate * end-of-year-population) * curve / aoc)
+  let weekOfYear (ticks mod 52) + 1
+  report floor ((rate * end-of-year-population) * array:item curve weekOfYear);/ aoc)
 end
 
 to immigrate
@@ -290,66 +299,98 @@ end
 
 to emigrate
   ask n-of (immigration-weekly emigration-rate) turtles [
+    print "DEADDD"
     die
   ]
 end
 
 to-report can-move [student house]
-  ifelse ( [budget] of student < [price] of house) or
-         ( [racist?] of house = true and [international?] of student = true ) or
+  ifelse ( [racist?] of house = true and [international?] of student = true ) or
          ( [sexist?] of house = true and [sex?] of student = [sexist-against?] of house ) [
     report false
-  ] [
+  ][
     report true
   ]
 end
 
 to move
   ask turtles [
-    ifelse moved-in? = true [
-      ;; Update moved-in time
-      set weeks-left weeks-left - 1
 
-      ;; Relocate if contract is about to exipre
-      if weeks-left < 30 [
+    ;; if turtle is moved in,
+    ;; updatetimeleft()
 
-        ;; Contract expired, become homeless
-        if weeks-left = 0 [
-          set moved-in? false
-          move-to one-of other houses with [ full? = false ]
-        ]
+    ;; if contractAlmostExpired?:
+    ;;    evictIfExpired()
+    ;;    lookForNewHouse()
 
-        ;; Search for new house
-        let possibleHouse one-of houses with [ full? = false ]
-        if can-move self possibleHouse [
-          move-to possibleHouse
-          set weeks-left [contract-length] of patch-here
+    ;; else,
+    ;;   if possible:
+    ;;     moveIn()
+    ;;    else:
+    ;;     lookForNewHouse()
+
+    ifelse (moved-in?) [
+      set weeks-left weeks-left - 1 ;; Update moved-in time
+
+      if weeks-left < 4 [
+
+        ifelse (weeks-left = 0) [
+          set moved-in? false ;; Contract expired, become homeless
+        ][
+          ;; Search for new house
+          let possibleHouse one-of houses with [ full? = false and price <= [budget] of myself ]
+          if (possibleHouse != NOBODY and can-move self possibleHouse) [
+            move-to possibleHouse
+            set weeks-left [contract-length] of patch-here
+          ]
         ]
       ]
-
-    ][
-      ;; Homeless turtle
-
-      ;; Move if not on available house
-      if [ full? ] of patch-here = true [
-        move-to one-of houses with [ full? = false ]
+    ][ ;; Turtle is homeless
+      let possibleHouse one-of houses with [ full? = false and price <= [budget] of myself ]
+      if (possibleHouse != NOBODY ) [
+        move-to one-of other houses with [ full? = false and price <= [budget] of myself ]
       ]
 
-      ;; Move in if you compatible with patch
-      ifelse can-move self patch-here [
+      if (can-move self patch-here) [
+        ;; Move in currently-viewed house if compatible with budget
         set moved-in? true
         set weeks-left [contract-length] of patch-here
-      ] [
-        ;; Move because cannot move to current patch
-        move-to one-of other houses with [ full? = false ]
       ]
+
     ]
+  ]
+end
+
+to move2
+  ask turtles [
+    ifelse (moved-in?) [
+      ;; If turtle is already  moved in
+      set weeks-left weeks-left - 1 ;; Update moved-in time
+      if weeks-left < 4 [
+        if (weeks-left = 0) [
+          set moved-in? false ;; Contract expired, become homeless
+        ]
+        search ;; Contact ending soon, look for new house
+      ]
+    ][
+      ;; If turtle is homeless
+      search
+    ]
+  ]
+end
+
+to search
+  let possibleHouse one-of houses with [ full? = false and price <= [budget] of myself ]
+  if (possibleHouse != NOBODY and can-move self possibleHouse) [
+    move-to possibleHouse
+    set weeks-left [contract-length] of patch-here
+    set moved-in? true
   ]
 end
 
 to recolor-patches
   ask houses [
-    ifelse full? = true [
+    ifelse (full?) [
       set pcolor red
     ][
       let viewing-turtles count turtles-here with [ moved-in? = false ]
@@ -386,7 +427,7 @@ GRAPHICS-WINDOW
 1
 1
 1
-ticks
+weeks
 30.0
 
 BUTTON
@@ -595,18 +636,18 @@ PLOT
 537
 221
 687
-Homeless percentage
+Homeless count
 NIL
 NIL
 0.0
 10.0
 0.0
-2.0
+1.0
 true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot count turtles with [moved-in? = false] / count turtles * 100"
+"default" 1.0 0 -16777216 true "" "plot (count turtles with [moved-in? = false])"
 
 SLIDER
 21
@@ -617,7 +658,7 @@ permit-density
 permit-density
 0
 100
-75.0
+10.0
 1
 1
 NIL
@@ -692,6 +733,17 @@ false
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "" "plot immigration-weekly annual-immigration-rate"
+
+MONITOR
+75
+674
+173
+719
+homeless count
+(count turtles with [moved-in? = false])
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
