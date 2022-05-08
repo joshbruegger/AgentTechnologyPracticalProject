@@ -279,7 +279,6 @@ to go
   emigrate
   immigrate
   move
-  ; move2
   ;recolor-patches ;; Runs very slowly!!!
 
   tick
@@ -299,7 +298,6 @@ end
 
 to emigrate
   ask n-of (immigration-weekly emigration-rate) turtles [
-    print "DEADDD"
     die
   ]
 end
@@ -314,54 +312,6 @@ to-report can-move [student house]
 end
 
 to move
-  ask turtles [
-
-    ;; if turtle is moved in,
-    ;; updatetimeleft()
-
-    ;; if contractAlmostExpired?:
-    ;;    evictIfExpired()
-    ;;    lookForNewHouse()
-
-    ;; else,
-    ;;   if possible:
-    ;;     moveIn()
-    ;;    else:
-    ;;     lookForNewHouse()
-
-    ifelse (moved-in?) [
-      set weeks-left weeks-left - 1 ;; Update moved-in time
-
-      if weeks-left < 4 [
-
-        ifelse (weeks-left = 0) [
-          set moved-in? false ;; Contract expired, become homeless
-        ][
-          ;; Search for new house
-          let possibleHouse one-of houses with [ full? = false and price <= [budget] of myself ]
-          if (possibleHouse != NOBODY and can-move self possibleHouse) [
-            move-to possibleHouse
-            set weeks-left [contract-length] of patch-here
-          ]
-        ]
-      ]
-    ][ ;; Turtle is homeless
-      let possibleHouse one-of houses with [ full? = false and price <= [budget] of myself ]
-      if (possibleHouse != NOBODY ) [
-        move-to one-of other houses with [ full? = false and price <= [budget] of myself ]
-      ]
-
-      if (can-move self patch-here) [
-        ;; Move in currently-viewed house if compatible with budget
-        set moved-in? true
-        set weeks-left [contract-length] of patch-here
-      ]
-
-    ]
-  ]
-end
-
-to move2
   ask turtles [
     ifelse (moved-in?) [
       ;; If turtle is already  moved in
